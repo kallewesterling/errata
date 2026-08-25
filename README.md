@@ -1,485 +1,360 @@
 # errata
 
-Finds errors in the code examples inside published course content, and keeps a dated record of the ones not yet fixed.
+Errata finds errors in the code examples inside published course content. It also keeps a dated record of the errors that you do not fix immediately.
 
-An *erratum* is a mistake in something already published, which is what these are: the courses are live, the code in them was correct when it was written, and some of it no longer is. The tool reads every `<pre data-lang="..."><code>` block, links it back to its source file and public URL, and checks what can be checked — that a transcript agrees with the command above it, that a config block parses, that a pinned image still resolves.
+An *erratum* is a mistake in work that is already published. The courses are live. The code in them was correct when an author wrote it. Some of it is not correct now.
 
-It runs alongside [Syncjar](https://github.com/kallewesterling/syncjar), which is what puts the content in git in the first place.
+Errata reads every `<pre data-lang="..."><code>` block in the lesson HTML. It links each block to its source file and to its public URL. It then checks what a machine can check. Errata also checks the links and the images in the lesson text.
 
-Course content stores code as `<pre data-lang="{language}"><code>…</code></pre>`. This tool builds an inventory of those blocks — each one tied to its course, lesson, file, and line — and then runs assertions over that inventory. It does the same for the links in lesson prose, which rot in their own ways.
+Errata works next to [Syncjar](https://github.com/kallewesterling/syncjar), which puts the content into git.
+
+## Requirements
+
+- Node.js 20 or later.
+- A content repository with an `errata.yaml` in it. See [Configure errata](#configure-errata).
 
 ## Quick start
 
+Clone errata beside your content repository:
+
+```
+~/code/
+  courses/    <- your content, with errata.yaml at its root
+  errata/     <- this tool
+```
+
+Point errata at the content. It reads the settings that sit beside it.
+
 ```bash
+cd ~/code/errata
 npm install
-npm test              # offline tier, ~1s, no network
-npm run test:network  # network tier: registry and link checks
-npm run test:all      # both
-npm run inventory     # summary of what was found
-npm run check:links   # links and images: dead, moved, and broken anchors
-npm run check:copies  # lessons that are copies of each other, and have drifted
+export ERRATA_ROOT=~/code/courses/courses
+
+npm test              # Offline checks. About one second. No network.
+npm run test:network  # Registry, link, and image checks.
+npm run test:all      # Both tiers.
 ```
 
-## Configuration
-
-Everything tunable lives in [`errata.yaml`](errata.yaml): content root, language taxonomy, the stale-image threshold, the private image allowlist, and which domains and links the link checker trusts or skips. `src/config.js` only loads and validates it.
-
-Which findings are currently accepted is a separate question, kept in `.errata.yaml` at the content root rather than here, for the reasons in [Known issues are named and dated](#known-issues-are-named-and-dated-not-counted).
-
-Validation is strict on purpose. Both files are edited by hand, and a mistyped key that silently defaulted would let the suite pass while checking nothing, so unknown settings, unknown keys, negative ceilings and unknown language kinds all fail at load with the file path in the message. A known-issues entry with no explanation is rejected outright: nothing is accepted without a reason.
+Three more commands write a report for a person to read:
 
 ```bash
-ERRATA_CONFIG=/path/to/config.yaml npm test   # use a different config
-ERRATA_ROOT=/path/to/courses npm test         # override just the content root
+npm run inventory     # A summary of the code blocks, and the open findings.
+npm run check:links   # Links and images that are dead, moved, or have a bad anchor.
+npm run check:copies  # Lessons that are copies of each other, and have drifted.
 ```
 
-### Private image allowlist
+## What errata checks
 
-Most courses should only reference images a reader can pull anonymously. A private image anywhere else usually means a sample was pasted from internal material, and the reader hits a 401.
+Errata makes an inventory of the content. It then runs the checks against that inventory.
 
-`privateImages.allowedCourses` lists the courses that legitimately teach against private or customer-scoped images. Any course not listed fails the network tier, naming the image and the line:
+| Area | Examples of what errata finds |
+|---|---|
+| Code blocks | A `<pre>` with no `data-lang`. A `<pre>` with no `<code>` child. |
+| Config blocks | JSON, YAML, Dockerfile, and Terraform blocks that do not parse. |
+| Commands and output | Output that contradicts the command above it. |
+| Metadata | A path in `lessons-meta.json` that matches no file. |
+| Container images | An image that does not resolve. An image that needs a login. |
+| Links | A dead link. A moved link. A `#anchor` that no longer exists. |
+| Images | An `<img src>` that does not load. |
+| Copies | Two lessons that were identical, and now differ. |
+
+For the reasons behind these checks, read [docs/design.md](docs/design.md).
+
+## Configure errata
+
+The settings describe your content, so they live with your content. Errata itself carries none. Copy [`errata.example.yaml`](errata.example.yaml) to the root of your content repository, name it `errata.yaml`, and edit it.
+
+```
+your-content-repo/
+  errata.yaml     <- settings
+  .errata.yaml    <- accepted findings
+  courses/        <- the content itself
+```
+
+The file records:
+
+- the content root
+- the language taxonomy
+- the registry prefixes, and the age limit for a pinned image
+- the courses that may use private images
+- the domains that errata trusts, and the links that it skips
+
+`src/config.js` only loads this file and validates it.
+
+### How errata finds the file
+
+Errata takes the first of these that exists:
+
+1. The path in `ERRATA_CONFIG`.
+2. `errata.yaml` beside `ERRATA_ROOT`, or in the directory above it.
+3. `errata.yaml` in the working directory, or in any directory above it.
+
+Rule 2 means that pointing errata at content is enough. Rule 3 means that errata works with no environment variables when you run it inside the content repository.
+
+If errata finds no file, it stops and lists every path that it tried.
+
+```bash
+ERRATA_ROOT=../courses/courses npm test           # Finds ../courses/errata.yaml.
+ERRATA_CONFIG=/path/to/errata.yaml npm test       # Names the file directly.
+```
+
+A relative `contentRoot` resolves against the config file, not against errata.
+
+### Validation is strict
+
+You edit this file by hand. A key with a wrong name must not take a default value quietly, because the suite would then pass while it checked nothing. Errata stops at load time for an unknown setting, an unknown key, a negative limit, or an unknown language kind. The message gives the file path.
+
+### Allow a private image
+
+Most courses must use only images that a reader can pull without a login. A private image in another course usually means that somebody pasted a sample from internal material. The reader then gets a 401 error.
+
+List the courses that teach with private images in `privateImages.allowedCourses`:
 
 ```yaml
 privateImages:
   allowedCourses:
-    # Builds and pulls yq from the package repository while teaching packaging.
+    # Builds and pulls yq from the package repository while it teaches packaging.
     - Build-Your-First-Chainguard-Container
 ```
 
-The allowlist is checked in both directions — a course listed here that no longer references a private image also fails, so entries don't outlive their reason.
+Errata checks this list in two directions. A course on the list that uses no private image also fails. An entry cannot outlive its reason.
 
-### Owned domains
+### Trust a domain
 
-`links.ownedDomains` is not the same idea as `primaryDomain`, which names the one site whose slugs build public lesson URLs. This list answers a different question: whose redirects do we trust enough to rewrite content against. A 301 from a site we run is a considered decision by someone reachable; a 301 from a third party is a stranger's URL shortener, an A/B test, or a consent wall. Matching is on the registrable domain, so every subdomain qualifies and `notchainguard.dev` does not.
+`links.ownedDomains` lists the domains that you control. Errata rewrites a moved link only when the domain is on this list. A redirect from your own site is a decision by a person you can ask. A redirect from another site can be a URL shortener, a test, or a consent page.
 
-## Design
+Errata matches the registrable domain. Every subdomain of `chainguard.dev` qualifies. The domain `notchainguard.dev` does not.
 
-### Extraction and testing are separate layers
+`links.ownedDomains` is not the same setting as `primaryDomain`. `primaryDomain` names the one site that supplies the public lesson URLs.
 
-`src/` builds the inventory; `tests/` asserts over it. The two change for different reasons — extraction changes when the source HTML changes, tests change when you decide what "correct" means — and keeping them apart stops every new test from re-parsing HTML.
+## Accept a finding that you cannot fix now
 
-### Blocks are located with a parser, captured as raw text
+Every check must come out clean. If you cannot fix a finding now, record it in `.errata.yaml`. This file is at the root of the **content** repository, not in errata.
 
-`src/extract.js` uses parse5 with `sourceCodeLocationInfo` to find each `<pre>`, then takes the code as a raw substring of the original file between the start-tag and end-tag offsets.
+Each entry names one finding:
 
-Reading `textContent` instead would be wrong. `<pre>` is not an HTML raw-text element, so unescaped markup inside a block is parsed as real markup and disappears:
+- which check found it
+- which instance the entry covers
+- why you did not fix it
+- the date of the decision
 
-```
-source:      <pre data-lang="dockerfile"><code>dfc <path_to_dockerfile></code></pre>
-textContent: "dfc "                    ← the argument is gone
-raw slice:   "dfc <path_to_dockerfile>"
-```
+An entry without a reason fails. Errata accepts nothing without a reason.
 
-The content contains exactly this case, so the parser gives correct block boundaries and line numbers while the raw slice gives byte-faithful content.
+Each entry also stores a fingerprint. The fingerprint is a hash of the code block. If somebody edits the block, errata opens the finding again. An entry therefore cannot excuse content that nobody has read since.
 
-### Identity and location are different things
+Errata reports three states. All three fail:
 
-Every block carries three ways to refer to it, because they answer different questions:
-
-| Field | Answers | Stable when |
+| State | Meaning | What to do |
 |---|---|---|
-| `id` | which block is this | prose around it is edited |
-| `fingerprint` | did the code change | whitespace-only edits |
-| `editorRef` / `url` | where do I go to fix it | — |
-
-`id` is a composite locator (`course-dir/lesson-slug/content-item-id#ordinal`) built from `lessons-meta.json`, so it survives edits elsewhere in the file. `fingerprint` hashes the normalized code, so it changes exactly when the block's content does. Line numbers are recorded for navigation only and are never used as identity, since any edit above a block renumbers it.
-
-### `kind` drives tests, not `data-lang`
-
-`console` and `ansi` are both terminal text, but only one is meant to be run. `src/config.js` maps each `data-lang` onto a `kind` — `shell`, `output`, `config`, or `source` — and tests dispatch on that. Blocks also carry advisory flags (`has-placeholder`, `multi-command`, `elided`, `excerpt`, `has-image-ref`) rather than being filtered out, so nothing becomes invisible.
-
-### `ansi` blocks are paired with the command that produced them
-
-Content uses `data-lang="ansi"` by convention for the output of the preceding command, with explanatory prose in between. Treating those 120 blocks as isolated text throws that relationship away, so `src/pairing.js` links them: an output block gets `respondsTo`, and the command gets `expectedOutput`.
-
-A single command's output is often split across several `ansi` blocks, so the search walks back through a run of consecutive output blocks to reach the command at its head. 114 of 120 output blocks pair, 23 of them through such a run.
-
-```
-$ cosign verify ... cgr.dev/chainguard/pytorch | jq     ← command
-Verification for cgr.dev/chainguard/pytorch:latest --   ← expectedOutput
-```
-
-Pairing is scoped to the content item, since a command and its output always live in the same lesson body. It is also what makes an execution tier possible later: a command with recorded expected output is a test case, whereas a command alone is only a syntax check.
-
-The convention doubles as a lint. Because `ansi` means output, a prompt inside one means the block is mislabelled — see `mislabeled-output` below.
-
-### Excerpts are not errors
-
-Documentation quotes fragments constantly: one element of an array, the body of an object, output abbreviated with `...`. Those cannot parse strictly and are correct as written. `src/parse-config.js` gives each config block a strict pass, then a fragment pass, and only reports `invalid` when it is neither. Without this, roughly half the JSON blocks look broken.
-
-### Only URLs that get fetched are liveness-checked
-
-Most URLs inside code blocks are data, not links — OIDC issuer identities, SBOM document namespaces, APK repository roots, API endpoints in sample output. Fetching them produces confident-looking false positives. The network tier checks only URLs passed to a fetching command, and skips `localhost`.
-
-The same applies to image references: the registry host also serves its own HTTP API and the Chainguard Libraries endpoints, so `src/classify.js` filters those out before anything is resolved.
-
-### Prose links are a different population from code URLs
-
-An `<a href>` in prose is a promise to the reader that there is something at the other end, so unlike a URL in a code block, every one is worth checking. `src/prose-links.js` extracts them with the same care `src/extract.js` gives code: located with a parser, but with the href recovered from the source text, because the parser decodes entities and a rewriter handed `?a=1&b=2` would silently fail to find `?a=1&amp;b=2` in the file.
-
-### Images are checked against the page, not against a manifest
-
-`<img src>` is extracted in the same pass, because an image is a stronger claim than a link. A reader can decline to follow a link; an image is part of the page, and when its source is gone the lesson renders with a hole where a screenshot of the thing being explained used to be.
-
-The content repository already had `tools/check-course-image-urls`, which checks that every asset in `course-images/image-manifest.json` is reachable on the bucket. That answers a related but different question. The manifest records what a migration uploaded; the HTML records what readers actually load. The two agree today — 226 unique images on both sides, no drift in either direction — but the manifest is a finished build artifact while the HTML keeps being edited through Skilljar, so the first image added in the Skilljar editor is one the manifest cannot know about. Checking the HTML is checking the thing that breaks.
-
-Because a bucket asset does not meaningfully move, images take the same liveness and redirect path as links but are reported as their own finding, named by their alt text, since the bucket names assets by hash and a URL alone is a poor way to identify a missing screenshot.
-
-### Repetition is the design, so drift is the finding
-
-Courses here are assembled from shared lessons. Painless Vulnerability Management is built from lessons belonging to four other courses; Securing the AI/ML Supply Chain bundles the AI/ML modules. Of 631 lessons long enough to compare, 29 pairs are word-for-word identical. A check that reported duplicates would be reporting several dozen editorial decisions.
-
-What is worth knowing is the pair that used to match and no longer does, because that is what an edit reaching one copy and missing the other looks like from outside either file. That comes to 23 pairs, which is a list a person can read.
-
-Comparison is by Jaccard similarity over five-word shingles. Single words would rank any two lessons about CVEs as the same, since they share a vocabulary; whole documents would catch only exact copies. Five words in the same order rarely coincide, and a small edit disturbs only the shingles that overlap it. The whole thing is exhaustive and quadratic, which at 631 documents means about 199,000 set intersections and a second of work — MinHash and LSH are the textbook answer to this shape of problem and would only add a sampling error to hide.
-
-Two details do most of the work. **Script elements are excluded**: 557 of the 743 content items carry a related-resources widget inside a `<script>` naming sibling courses, so it differs in every copy by design, and left in it dominates every comparison it takes part in. **Block boundaries survive normalization**, so a command with no full stop after it does not run into the sentence that follows; without that, a changed command and a rewritten paragraph arrive as one blob.
-
-### Nothing about drift fails a run
-
-A lesson written to stand alone opens differently from the same lesson inside a learning path, and says "in this course" where its twin says "in this module". That is correct, and indistinguishable by machine from a fix that landed on one side only. So this reports and stops, in the same spirit as `moved-link-review`.
-
-The one distinction worth drawing is whether a difference touches something executable. Two copies whose *prose* diverges are usually fine; two copies whose *commands* diverge are the case least likely to be intentional and the most expensive to meet as a reader. Those are called out by name, and still do not fail.
-
-### The linkage map may be the more useful half
-
-Grouping identical code across courses answers a question that is otherwise very hard to ask: if this command is wrong, where else is it wrong? 103 block texts appear in more than one course.
-
-Blocks earn a place by carrying detail that can rot — more than one line, or one long enough to hold a URL or a pinned version. `$ apk update` appears in four courses and does not matter, because there is nothing in it to get out of step. `$ curl -o chainctl "https://dl.enforce.dev/chainctl/latest/..."` appears in three and very much does.
-
-### A link can rot in three different ways
-
-Status-code checking alone answers only the first of these, which is how links quietly decay while every automated check passes:
-
-| What is wrong | What a 404-only check sees |
-|---|---|
-| the page is gone | caught |
-| the page moved, and answers with a 301 | looks perfectly healthy |
-| the page is fine but the `#anchor` is gone | looks perfectly healthy |
-
-Against the current content the second case dominates: **101 of 219 links to Chainguard-owned domains point at a page that has permanently moved**, none of which the previous checker ever reported.
-
-Two traps make this harder than it looks. A fragment is never sent to a server, so a response URL can never carry one — comparing with the fragment attached reports every fragment link as relocated. And the same fact means the naive rewrite *deletes* every `#section` it touches, leaving a link that still resolves while the sentence around it goes on promising a section the reader is no longer taken to. `comparable()` handles the first, `rewriteTarget()` the second.
-
-### Which redirects may be applied without a person
-
-A 301 is authoritative about where a page went, but not every 301 is a page move: sites also use them to sweep retired sections onto a landing page. Following one of those turns a precise reference into a vague one *and reports success*, which is worse than leaving it alone.
-
-`src/link-health.js` applies a redirect only when the page kept its own name — the last path segment is unchanged. Whole sections get renamed around a page without the page itself changing, and those are the moves worth applying in bulk. Where the name did change, the destination is held back if it is an ancestor of some other page we have seen, which is how a section index is told apart from a page without hardcoding anything about the site.
-
-Counting how many links share a destination is deliberately *not* a signal. After a reorganization several old addresses legitimately resolve to one new page, and treating that as suspicious held back exactly the links most worth fixing.
-
-On the current content this leaves 101 rewritten automatically and 8 held for a person, each of which is a real judgement call — a retired comparison page swept into its section index, a blog post collapsed onto the blog index, one page redirecting to the site root.
-
-### Discrepancies are warnings, and severity is a separate axis
-
-Pairing makes a third class of problem detectable: a command whose recorded output contradicts it. Those are reported as warnings, because a hit is a genuine inconsistency but occasionally an intentional one.
-
-Blocks therefore carry three separate things, which are easy to conflate but shouldn't be:
-
-| Field | Means | Example |
-|---|---|---|
-| `anomalies` | the HTML itself is malformed | `<pre>` with no `<code>` child |
-| `flags` | neutral description | `has-placeholder`, `multi-command` |
-| `warnings` | probably a content bug, possibly deliberate | output contradicts its command |
-
-`src/warnings.js` holds the offline rules, which compare the content against itself and so are deterministic: `digest-mismatch`, `image-mismatch`, `tag-mismatch`. Each is written to stay quiet unless both sides make a claim and the claims disagree — output listing extra layer digests alongside the pinned one does not trigger anything.
-
-### Staleness is measured in age, not in difference
-
-`src/drift.js` compares digests pinned in the content against the registry. The obvious check — is this pin still what the tag serves — turns out to be worthless here: these images rebuild continuously, so **21 of 23 pins are behind their tag**, and being behind says nothing at all.
-
-What carries signal is *how far* behind. `src/registry.js` reads the build date from the image config blob, so a pin can be reported as "built 2023-05-12, 1201 days old" rather than a meaningless boolean. Anything past `staleImageDays` (one year) is flagged, and the report is ranked by age so the worst offenders come first.
-
-This is a warning rather than a failure for a second reason beyond intent: a few lessons pin an old image deliberately, to demonstrate a diff against a newer one. A pin that stops resolving *entirely* is a different matter and fails in the reference tests.
-
-### Known issues are named and dated, not counted
-
-The suite was switched on against content that already had problems. The first version of this held each one at a count and failed if the count grew, which turned out to be the wrong shape. A number says only how many instances were tolerated. It cannot say which instance, or why, and it cannot notice when one is fixed while another regresses and the total stays put.
-
-Instead, `.errata.yaml` at the **content** repository root records each accepted finding individually: which check, which instance, why it is not fixed, and when that was decided. Every check must otherwise come out clean.
-
-The part that makes this maintain itself is the fingerprint. An entry pins the hash of the block it was accepted against, so editing that block reopens the finding rather than leaving it excused against content nobody has looked at since. Three states are reported and all three fail:
-
-| State | Meaning |
-|---|---|
-| open | A finding nothing accounts for |
-| stale | The block changed after the entry was written, so the note may no longer describe it |
-| resolved | The entry matches nothing, so the problem is gone and the entry should be deleted |
-
-Findings about a file's existence rather than its contents omit the fingerprint, since there is no content to hash.
-
-The file also carries a `notes` section for things a person noticed that no check looks for — a transcript whose totals do not add up, prose that contradicts the command above it. Those suppress nothing and fail nothing; they exist so the observation survives to whoever revises the lesson next.
-
-One case genuinely does not fit and keeps a ceiling: `driftBudget.staleImageRefs`. An entry expires when its content changes, which is right for a discrete bug and useless for a pinned digest that ages a day every day while the block itself never changes.
-
-#### Why the file lives with the content, and why it is a dotfile
-
-The content repository syncs with Skilljar in both directions, and a daily CI job pulls Skilljar into git. Anything recorded inside the lesson HTML is therefore at the mercy of a round-trip through a rich-text editor, which may silently drop HTML comments. Anything recorded in the tester's own config, meanwhile, does not travel with the content it describes.
-
-A dotfile at the content root sits outside both paths. Syncjar never pushes it to Skilljar, and the GCS documentation export walks `[A-Z]*/lessons/`, so it is not swept up there either. Notes in it can be candid in a way that notes shipped to a learner's page source cannot.
-
-### Every finding is described in exactly one place
-
-The remediation text for a finding belongs next to the rule that detects it, not in the test that asserts on it, so `src/problems.js` holds the catalogue: for each check, what it looks for, why it matters, and what to do about it. The offline suite iterates that catalogue to generate its assertions, and `npm run inventory -- --problems` prints the same entries. A contributor sees identical wording whether the finding reaches them through a failing test or the CLI.
-
-Each report answers three questions in the same order, because a finding without a location is not actionable and one without a remediation makes the reader guess:
-
-```
-! blocks labelled as output that contain a command (5)
-  data-lang="ansi" means output only. These carry a shell prompt, usually a
-  decorated one such as ❯ or ➜ rather than the $ used elsewhere, so the
-  command a reader needs to run is buried in a block styled as a transcript.
-  1. ❯ docker pull cgr.dev/chainguard/wolfi-base
-     _local-mirror/courses/Crush-Your-CVEs/lessons/20-.../content-3chz.html:34:29
-     https://courses.chainguard.dev/crush-your-cves/catching-cves-before-production
-  Fix: Move the command into its own <pre data-lang="console"> block above
-  the output, and use the "$ " prompt to match the rest of the content.
+| open | No entry covers this finding. | Fix the content, or add an entry. |
+| stale | The block changed after you wrote the entry. | Read the finding again. Update or delete the entry. |
+| resolved | The entry covers no finding. | Delete the entry. |
+
+The file also has a `notes` section. Use it for an observation that no check looks for. A note suppresses nothing and fails nothing. It survives for the next person who edits the lesson.
+
+One check keeps a numeric limit instead: `driftBudget.staleImageRefs`. A pinned digest gets one day older every day, but the block itself never changes, so a fingerprint cannot expire the entry.
+
+## Commands
+
+### Inventory
+
+```bash
+npm run inventory                          # Summary counts, and a tally of findings.
+npm run inventory -- --problems            # Open findings, with locations and repairs.
+npm run inventory -- --problems --all      # Add the accepted findings and the notes.
+npm run inventory -- --problems --limit 0  # Do not shorten long lists.
+npm run inventory -- --json                # The full inventory as JSON.
+npm run inventory -- --lang console        # Filter by data-lang.
+npm run inventory -- --flag has-placeholder
+npm run inventory -- --anomalies           # Only the blocks that have anomalies.
+npm run inventory -- --pairs               # Commands beside their expected output.
+npm run inventory -- --warnings            # Discrepancies between a command and its output.
 ```
 
-The count trails the title rather than leading it, so the line reads correctly at any number instead of producing "1 blocks with". Locations are `path:line:column`, which most editors will open directly, followed by the public lesson URL.
+Use `--problems` when you repair content. It exits with a non-zero code for an open finding, and for an entry that is stale or resolved. You can therefore run it before a commit. It also prints the key to copy into `.errata.yaml`.
 
-`src/report.js` handles colour, honouring `NO_COLOR` and `FORCE_COLOR` ahead of TTY detection. The two are not treated as equals: the test runner sets `NO_COLOR` on its workers whenever output is piped, so an explicit `FORCE_COLOR` has to win or paging a failure through `less -R` would lose its colour.
+Add `--color` or `--no-color` to override the automatic detection.
 
-Reports are written to stderr and the assertion message is kept to one line. The runner strips ANSI from assertion messages and renders long ones inside a diff view that mangles the layout, so a report embedded in the assertion arrives unreadable.
+Errata builds the inventory in memory on each run. It commits nothing.
 
-## Test tiers
+### Links and images
 
-**Offline** (`tests/offline/`, no network) — extractor and pairing unit tests; every block has a known `data-lang`; JSON, YAML, Dockerfile and Terraform blocks parse or are recognized excerpts; shell prompt style is consistent; output blocks pair with a command and are never marked runnable; metadata paths match disk; lessons that are copies of each other are reported, never failed.
+```bash
+npm run check:links                # Check every link and every image.
+npm run check:links -- --owned     # Check only the domains that you own.
+npm run check:links -- --json      # Machine-readable output.
+npm run check:links -- --markdown  # A body for a pull request.
+npm run fix:links                  # Rewrite the links that moved permanently.
+npm run fix:links -- --dry-run     # Show the changes, but write nothing.
+```
 
-**Network** (`tests/network/`) — container image references resolve against the registry; images needing auth appear only in allowlisted courses; URLs that commands fetch are live; prose links resolve, with their anchors; every `<img src>` loads; digest pins are checked for age.
+`fix:links` changes a link only when all of these are true:
 
-The link tier fails only on findings that need a person: a dead link or a missing anchor. A permanently moved link is real but mechanically repairable, so it is reported and left to `npm run fix:links` rather than failing a suite nobody can make green by editing content.
+- The check that has only now run confirmed that the page moved permanently.
+- The old URL maps to exactly one new URL.
+- The domain is in `links.ownedDomains`.
 
-Registry lookups retry with backoff before reporting a reference as broken. The registry rate-limits and both network files resolve references at once, so without it a run occasionally failed on connection trouble rather than on anything in the content, and a suite that fails at random gets ignored.
+`fix:links` edits the `href` text where it stands. It does not write the HTML document again. These files go back to Skilljar, and a regenerated document gives you a diff that nobody can review.
 
-## What it currently finds
-
-761 blocks across 29 of the 53 courses, in 121 files. The other 24 courses contain no code at all, which was verified against a raw scan for `<pre>` rather than assumed. All 68 container image references resolve.
-
-### Fixed
-
-Applied on the `chore/code-block-content-fixes` branch of the content repository:
-
-- **A `<path_to_dockerfile>` placeholder that readers never saw.** `<pre>` is not a raw-text element, so the browser parsed the placeholder as an unknown tag and rendered nothing: the DFC help text showed `dfc` followed by blank space. A repository-wide scan for non-HTML tags confirmed it was the only one.
-- **A YAML block indented with tabs**, in Custom Assembly through the Chainguard API. YAML forbids tab indentation, so copying it into `build.yaml` produced a parse error. Three other blocks contain tabs and were left alone: they are Go and JSON, where tabs are legal.
-- **A `<pre>` with no `data-lang` and no `<code>` child**, the only one in a course whose other twelve blocks all follow the convention.
-- **3 `ansi` blocks that opened with a command** behind a decorated `❯` prompt, split into a `console` command block and an `ansi` output block.
-- **Editorial prose pasted inside a Grype transcript**, duplicated across two courses. Two sentences and two output lines sat inside the `<pre>`, and the same text follows immediately as real markup.
-- **2 shell commands missing the `$` prompt** used by the command directly above them in the same list.
-- **A prompt shown as a command.** A lesson says "you should receive a prompt" and shows `#` in a `console` block, which marks it as something to type. It is now `ansi`.
-
-### Left for an author
-
-- **A spliced Grype transcript**, in the AIML and Securing-the-AIML courses. It joins the tail of a scan of the PyTorch runtime image onto a second `grype pytorch/pytorch` run against `:latest`. The package and CVE counts quoted in the prose come from the second run, so untangling it means re-running Grype and restating those numbers.
-- **Output captured from a different run**, in Getting Started With Chainguard Containers → How To Update Containers. The command runs `chainctl images diff` on valkey digests `ef876a…` and `a53bd8…`, the prose says "this responded with the following output", and the output reports `408e8f…` and `550bd0…` instead.
-- **Every digest pin in the content is over a year old.** All 21 resolvable pins exceed the one-year threshold; the youngest is 525 days and five are over three years, the oldest built 2023-05-12. The package versions and CVE counts in the surrounding prose describe those builds.
-- **2 unreferenced content files** in `Tailoring-the-Chainguard-Message`, placeholder lessons that no `lessons-meta.json` points at. Wiring them up or deleting them is an editorial decision.
-- **3 output blocks with no command to attach to**, where the producing command is genuinely implicit: output of a build or an agent session driven by the block above.
-
-### Links
-
-Of 646 unique prose links, 219 are on Chainguard-owned domains. Those break down as 92 healthy, 101 permanently moved, 10 dead, 8 needing a decision, 2 pointing at a heading that no longer exists.
-
-- **The documentation site reorganized underneath the courses.** `chainguard-images` became `containers`, `open-source/melange` became `open-source/build-tools/melange`, `chainguard/administration` became `platform/administration`, `chainguard/migration` became `get-started/migration`. Every one still answers, so nothing looked wrong. `npm run fix:links` rewrites all 101 across 51 files, carrying fragments across.
-- **8 course links are genuinely dead**, seven of them lessons under `partner-guide-to-chainguard-pricing`. The path root still serves 200 and the course under it does not, and this site answers a login gate with a 302 rather than a 404, so these are gone rather than gated.
-- **2 links point at headings that no longer exist.** Both survived years of link checking because the page returns 200; only reading the document for the anchor finds them.
+Both commands exit with a non-zero code only for a finding that needs a person.
 
 ### Copies
 
-29 lesson pairs are identical, 23 have drifted, and 2 of those differ in a command. Three of the drifts look like edits that reached one copy and missed the other:
-
-- **A command that gained a flag in one place only.** One copy of the debug lesson runs `docker debug -it nginx-container`, the other `docker debug nginx-container`.
-- **A caveat added to one copy.** In Handling Missing Dependencies, one copy was updated to `wolfi-base`, gained a note about organisation access and an extra command; the other still says `chainguard-base` with neither.
-- **A rename applied unevenly.** Containers Overview differs by one letter: "a new version of a Chainguard Container is available" against "a Chainguard**s** is available". Two files carry the ungrammatical form.
-
-A fourth turned up while comparing the resources widget rather than the prose. `Containers-Containers-Containers/60-How-to-Debug-Chainguard-Images` has `description: "&mdash;Chainguard Containers Documentation"` inside a `<script>`, where entities are not decoded, so it renders literally on the page. Its sibling copy is clean.
-
-### Images
-
-All 226 unique images, across 309 occurrences, resolve. Every one is on the GCS bucket, none are relative, and there are no `srcset`, `poster` or inline-CSS `url()` references to worry about. This is the answer worth having on record: the bucket is healthy, and now the check watches what the lessons display rather than what a migration wrote down.
-
-### What running against the real repository changed in the tool
-
-Two-thirds of the "promptless shell block" findings turned out to be the checker's fault, which is the kind of thing only real content surfaces:
-
-- **A container prompt is a prompt.** Six blocks used `nginx:/#`, which is exactly what the reader sees after attaching to the container and is the point of the lesson. Asking an author to replace it with `$` would have made the content worse.
-- **A script is not a transcript.** One block is a `#!/usr/bin/env bash` file to save, so it has no prompt by design.
-- **`#` opens a comment, not a root shell.** All 21 of its occurrences introduce comments like `# Install (macOS)`, and reading them as root prompts invented 16 commands that no reader is meant to run.
-- **A bare prompt is not a hidden command.** `#` on its own is a prompt being displayed, so the mislabelled-output rule now requires something to follow the marker.
-
-Two conventions for showing output coexist: a separate `ansi` block (120 blocks) and output inline in the `console` block (42 blocks). Both are recognized; neither is treated as an error.
-
-## Pointing at other content
-
-`src/mirror.js` is the only module that knows the directory layout. The path comes from `contentRoot` in the config file, or `ERRATA_ROOT` at runtime. Swapping in [Syncjar](https://github.com/kallewesterling/syncjar) output should be a change to this one module.
-
 ```bash
-ERRATA_ROOT=/path/to/courses npm test
+npm run check:copies             # Drifted pairs, with the differences.
+npm run check:copies -- --map    # Where else the same code appears.
+npm run check:copies -- --all    # Include the pairs that still agree.
+npm run check:copies -- --json   # Machine-readable output.
 ```
 
-## Working with Syncjar
+`check:copies` always exits with zero. Drift is a question for an author, and the map is not a finding.
 
-[Syncjar](https://github.com/kallewesterling/syncjar) moves content between Skilljar and git. Errata reads what lands in git and never talks to Skilljar at all. The division is clean everywhere except link checking, where Syncjar has a script errata supersedes — see below.
+## Test tiers
 
-The two meet at one place: a directory of courses, which Syncjar names `COURSE_CONTENT_PATH` and errata names `ERRATA_ROOT`.
+**Offline** (`tests/offline/`) needs no network. It runs in about one second. It checks that:
 
-Point both at the same directory and the loop is pull, check, fix, check, push.
+- the extractor and the pairing work
+- every block has a known `data-lang`
+- each config block parses, or is a recognized excerpt
+- the prompt style is consistent
+- each output block pairs with a command
+- the metadata paths match the disk
+
+This tier also reports the lessons that are copies of each other. It never fails because of them.
+
+**Network** (`tests/network/`) needs the internet. It checks that:
+
+- every container image reference resolves
+- an image that needs a login appears only in an allowlisted course
+- the URLs that commands fetch are live
+- every prose link resolves, and its anchor exists
+- every image loads
+- each pinned digest is inside the age limit
+
+The link tier fails only for a finding that a person must repair: a dead link, or a missing anchor. A moved link is a real problem, but errata can repair it, so the tier reports it and leaves it to `npm run fix:links`.
+
+Registry lookups retry after a delay before errata reports an image as broken. The registry limits the request rate, and both network test files resolve images at the same time. Without the retry, a run sometimes failed because of the connection and not because of the content. People ignore a suite that fails at random.
+
+## Use errata with Syncjar
+
+Syncjar moves content between Skilljar and git. Errata reads the content that arrives in git. Errata never connects to Skilljar.
+
+The two tools share one directory of courses. Syncjar calls it `COURSE_CONTENT_PATH`. Errata calls it `ERRATA_ROOT`.
+
+Point both tools at the same directory. The loop is pull, check, fix, check, push.
 
 ```bash
-# 1. Bring Skilljar into git.
+# 1. Bring the Skilljar content into git.
 cd ~/syncjar
 COURSE_CONTENT_PATH=~/courses npm run pull
 
-# 2. Check what arrived. Nothing here needs the network except the last two.
+# 2. Check what arrived. Only the last two commands need the network.
 cd ~/errata
 export ERRATA_ROOT=~/courses/courses
-npm run test:offline          # structure, parsing, pairing, metadata
-npm run check:copies          # lessons that are copies, and have drifted
-npm run check:links           # every link and image, against the live web
+npm run test:offline          # Structure, parsing, pairing, and metadata.
+npm run check:copies          # Lessons that are copies, and have drifted.
+npm run check:links           # Every link and image, against the live web.
 
-# 3. Fix. Some of it is mechanical.
+# 3. Repair. Some of the work is mechanical.
 npm run fix:links -- --dry-run
 npm run fix:links
 
-# 4. Confirm, then send it back.
+# 4. Check again, then send the content back.
 npm run test:offline
 cd ~/syncjar
 COURSE_CONTENT_PATH=~/courses npm run push -- --dry-run
 COURSE_CONTENT_PATH=~/courses npm run push
 ```
 
-`ERRATA_ROOT` points one level deeper than `COURSE_CONTENT_PATH`, at the `courses/` directory inside the content repository rather than the repository root. That is the layout of this particular content repository rather than anything either tool requires; `contentRoot` in `errata.yaml` records it.
+`ERRATA_ROOT` points one level deeper than `COURSE_CONTENT_PATH`. It points at the `courses/` directory inside the content repository. This is the layout of this content repository, and neither tool requires it. `contentRoot` in `errata.yaml` records it.
 
-### This supersedes Syncjar's `check:links`
+Setting `ERRATA_ROOT` is also how errata finds its settings. It looks beside that directory and in the directory above it, which is where `errata.yaml` sits.
 
-Syncjar has a script of the same name. It is not checking a different population: `public/courses/` is a copy of the same lessons, written by `npm run generate:courses` from the same `lessons-meta.json`. It is the same links, read from a gitignored duplicate that only exists after a preview build.
+### Check the content before you push it
 
-It cannot see the findings that matter most here. It follows redirects without recording them, so the 101 permanently moved links in this content all answer 200 and look healthy. It never fetches a page body, so a `#anchor` pointing at a heading that no longer exists is invisible. It sends only HEAD, so a host that refuses HEAD is reported as broken. Every exception collapses into `status: 'ERROR'`, which makes a timeout indistinguishable from a domain that no longer resolves.
+Skilljar is the published site. An error that reaches Skilljar stays in front of learners until the next round trip. Errata works on local files, so the check is cheap between `pull` and `push`.
 
-It also passes `timeout: 5000` to `node-fetch`, which was a v2 option; the dependency is `^3.3.2`, where that key is ignored and an unresponsive host has no deadline at all. The report it writes, `public/data/link-report.json`, is gitignored, and nothing in the repository reads it.
+This also matters for `fix:links`. It edits the `href` text where it stands, so `npm run push -- --dry-run` shows you 159 changed URLs instead of 51 files of reformatted markup. Syncjar shows you that diff before it uploads anything.
 
-Run errata's instead. If the preview UI ever wants a report, `npm run check:links -- --json` produces one.
+### Record notes in .errata.yaml, not in the HTML
 
-### Check before you push, not after
+The content goes through the Skilljar editor, and the editor can change the markup. An HTML comment in a lesson can disappear.
 
-Skilljar is the published site, so anything wrong that reaches it is wrong in front of learners until the next round trip. Everything errata does works on local files, which makes the check cheap to run between `pull` and `push`.
+Keep your notes in `.errata.yaml` at the content root instead. Syncjar never uploads that file. The documentation export reads only `[A-Z]*/lessons/`, so the export does not collect it either. The file survives the round trip in both directions.
 
-This also matters for `fix:links`. It edits the `href` text in place instead of reserializing the HTML, specifically so that `npm run push -- --dry-run` shows you 159 changed URLs rather than 51 files of reformatted markup. A rewriter that regenerated the document would produce a diff nobody could read, and Syncjar shows you that diff before it uploads anything.
+### Edit a shared lesson
 
-### Notes survive the round trip, HTML comments may not
-
-Content goes through Skilljar's editor, which can rewrite markup, so an HTML comment left in a lesson is not guaranteed to come back. `.errata.yaml` lives at the content root instead. Syncjar never uploads it, and it is outside the `[A-Z]*/lessons/` glob the documentation export walks, so it survives both directions. Record accepted findings and standing notes there rather than in the lessons.
-
-### Editing a shared lesson
-
-Courses here reuse lessons, so a change often belongs in more than one place. Before editing, ask what else carries the same text:
+Courses reuse lessons, so a change often belongs in more than one file. Before you edit a lesson, find the other copies of the text:
 
 ```bash
 npm run check:copies -- --map
 ```
 
-After editing, run `npm run check:copies` to see whether the copies you did not touch have now drifted from the one you did.
+After you edit the lesson, run `npm run check:copies`. It tells you whether the copies that you did not edit have drifted from the copy that you did edit.
 
-### In CI
+### Run errata in CI
 
-The daily sync job opens a pull request titled "Sync Skilljar content" on `chore/sync-skilljar`. That pull request is the natural place to run errata, because it is the moment content enters git and the last moment before anyone builds on it. The link check runs on its own weekly schedule instead, since links rot on the web's timetable rather than on an author's.
+The daily sync job opens a pull request with the title "Sync Skilljar content" on the `chore/sync-skilljar` branch. Run errata on that pull request. It is the moment when content enters git, and the last moment before somebody builds on it.
 
-## Inventory CLI
+Run the link check on its own weekly schedule. Links break on the schedule of the web, not on the schedule of an author.
 
-```bash
-npm run inventory                        # summary counts, with a problem tally
-npm run inventory -- --problems          # open findings, with locations and fixes
-npm run inventory -- --problems --all    # add accepted findings, and why, plus notes
-npm run inventory -- --problems --limit 0   # do not truncate long lists
-npm run inventory -- --json              # full inventory as JSON
-npm run inventory -- --lang console      # filter by data-lang
-npm run inventory -- --flag has-placeholder
-npm run inventory -- --anomalies         # only blocks with anomalies
-npm run inventory -- --pairs             # commands beside their expected output
-npm run inventory -- --warnings          # cross-reference discrepancies
-```
+## What errata replaces
 
-`--problems` is the view for fixing content: it exits non-zero on any open finding, and on any known-issues entry that has gone stale or resolved, so it works as a pre-commit check. It also prints the key to paste into `.errata.yaml` when a finding is one you mean to accept. Add `--color` or `--no-color` to override the automatic detection.
+Errata replaces three scripts. Each of them checks whether a URL answers.
 
-The inventory is built in memory on each run; nothing is committed.
-
-## Link CLI
-
-```bash
-npm run check:links                      # check every prose link and report
-npm run check:links -- --owned           # only Chainguard-owned domains
-npm run check:links -- --json            # machine-readable
-npm run check:links -- --markdown        # a pull-request body
-npm run fix:links                        # rewrite the permanently moved links
-npm run fix:links -- --dry-run           # show what would change
-```
-
-`fix:links` only ever touches links a check has just confirmed are permanently moved, one-to-one, on a domain listed in `links.ownedDomains`. It edits the href text in place rather than reserializing the HTML, because these files round-trip to Skilljar and a regenerated document produces a diff of incidental markup changes nobody can review.
-
-Both commands exit non-zero only on findings that need a person.
-
-### Copies CLI
-
-```bash
-npm run check:copies                     # drifted pairs, with the differences
-npm run check:copies -- --map            # what a change here also changes
-npm run check:copies -- --all            # include pairs that are still in sync
-npm run check:copies -- --json           # machine-readable
-```
-
-Always exits zero. Drift here is a question for an author, and the map is not a finding at all.
-
-### What this replaces
-
-Three scripts, all of which check whether a URL answers. Two live in the content repository; the third is Syncjar's `check:links`, covered under [Working with Syncjar](#this-supersedes-syncjars-checklinks).
-
-`tools/check-course-image-urls` HEAD-requests every asset in the image manifest and exits non-zero if any fail. Errata covers it by checking the images the lessons actually reference, and separates a timed-out request from a genuinely missing asset, which that tool reports identically.
-
-`tools/chainlink` and its workflow. The differences that matter:
-
-| | chainlink | errata |
+| Script | Where it lives | Why errata replaces it |
 |---|---|---|
-| a request that times out | recorded as a 404 | reported separately as unreachable |
-| a page that moved | reported as healthy | rewritten, or held for review |
-| a missing `#anchor` | invisible | reported |
-| output | an issue listing URLs | a pull request with the fixes applied |
-| skipping a link | a bare regex in `ignore.json` | a pattern with a required reason |
+| `tools/chainlink` | Content repository | See the table below. |
+| `tools/check-course-image-urls` | Content repository | It checks the image manifest. Errata checks the images that the lessons show. |
+| `check:links` | Syncjar | It reads a gitignored copy of the same lessons. It misses moved links and bad anchors. |
 
-`links.skip` requires a `why` for every entry, because an unexplained skip is indistinguishable from a broken link somebody gave up on — and unlike a known-issues entry, nothing there expires.
+These are the differences from `chainlink`:
 
-## Layout
+| Case | chainlink | errata |
+|---|---|---|
+| A request times out | Records it as a 404 | Reports it separately, as unreachable |
+| A page moved | Reports it as healthy | Rewrites it, or holds it for a person |
+| A `#anchor` is missing | Does not see it | Reports it |
+| Output | An issue that lists URLs | A pull request with the repairs applied |
+| A skipped link | A bare regular expression in `ignore.json` | A pattern with a reason that you must give |
+
+Every entry in `links.skip` needs a `why`. A skip with no reason looks the same as a broken link that somebody gave up on. Nothing in that file expires, so the reason must be there from the start.
+
+## Project layout
+
+Errata holds no settings of its own. Both files below live in the content repository.
 
 ```
-errata.yaml   settings: paths, taxonomy, drift ceiling, allowlist
-<content root>/../.errata.yaml   accepted findings and standing notes
+errata.example.yaml              A template to copy into your content repository.
+<content repo>/errata.yaml       Settings: paths, taxonomy, limits, allowlists.
+<content repo>/.errata.yaml      Accepted findings and standing notes.
 src/
-  config.js         loads and validates the YAML above
-  known-issues.js   reads and validates the accepted-findings file
-  mirror.js         source adapter: courses, lessons, public URLs
-  extract.js        parse5 locate + raw slice, anomaly detection
-  prose-links.js    <a href> and <img src>, taken from the source text
-  duplication.js    visible text, shingles, drift between copies
-  classify.js       kind mapping, shell splitting, image and URL detection
-  pairing.js        links output blocks to the command that produced them
-  warnings.js       offline rules comparing a command against its own output
-  problems.js       the catalogue: what each check finds, why, and the fix
-  report.js         colour and the what/where/fix problem layout
-  drift.js          age of digest pins, measured against the registry
-  parse-config.js   strict-then-fragment parsing for JSON/YAML/Dockerfile/HCL
-  integrity.js      metadata-vs-disk path checks
-  inventory.js      assembles the block records
-  registry.js       anonymous registry manifest resolution
-  links.js          URL liveness, redirect capture, anchor validation
-  link-health.js    which redirects are safe to apply, and the link findings
-tests/helpers.js    assertions that print a full report on failure
-tests/offline/      fast tier, runs on every commit
-tests/network/      slower tier, needs network
+  config.js         Loads and validates errata.yaml.
+  known-issues.js   Reads and validates the accepted-findings file.
+  mirror.js         Source adapter: courses, lessons, and public URLs.
+  extract.js        Finds the code blocks. Detects anomalies.
+  prose-links.js    Reads <a href> and <img src> from the source text.
+  duplication.js    Visible text, shingles, and drift between copies.
+  classify.js       Language kinds, shell splitting, image and URL detection.
+  pairing.js        Links an output block to the command that produced it.
+  warnings.js       Offline rules that compare a command with its own output.
+  problems.js       The catalog: what each check finds, why, and the repair.
+  report.js         Color, and the what/where/repair layout.
+  drift.js          The age of each pinned digest, measured at the registry.
+  parse-config.js   Parses JSON, YAML, Dockerfile, and HCL blocks.
+  integrity.js      Compares the metadata with the disk.
+  inventory.js      Assembles the block records.
+  registry.js       Resolves registry manifests without a login.
+  links.js          URL liveness, redirects, and anchor validation.
+  link-health.js    Decides which redirects are safe to apply.
+scripts/            The three command-line tools.
+tests/helpers.js    Assertions that print a full report when they fail.
+tests/offline/      Fast tier. Run it on every commit.
+tests/network/      Slower tier. Needs the network.
 ```
 
 ## Next steps
 
-- Extend link checking to prose `<a href>` links, which is where most real link rot lives.
-- Execute `runnable` shell blocks in a container and compare against `expectedOutput` (475 blocks, 587 commands; 91 have recorded output to check against).
-- Check the remaining facts in paired output — package versions, CVE identifiers, package counts — against what the command returns today. Unlike digests these cannot be resolved from registry metadata alone, so they need the execution tier.
-- Read from Syncjar directly instead of a mirror.
+- Run the shell blocks in a container, and compare the result with the recorded output. The content has 478 runnable blocks and 634 commands. 95 of the blocks have recorded output.
+- Check the other facts in paired output: package versions, CVE identifiers, and package counts. A registry lookup cannot supply these, so they need the execution tier.
+- Read from Syncjar directly, instead of from a mirror.
