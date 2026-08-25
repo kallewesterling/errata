@@ -1,0 +1,13 @@
+<h2>Install the tool</h2>
+<p class="lead">This lesson is fixture content. It stands in for a real lesson so that the checks which walk a content tree have something to walk. Read it as a shape rather than as instruction.</p>
+<p>A lesson body is a fragment of HTML. Code appears in a <code>pre</code> element that carries a <code>data-lang</code> attribute, and the attribute tells the checks how to treat the block. A block of commands is one thing, and a transcript of what those commands printed is another, so the two never share a language.</p>
+<p>Start by asking the tool which version you have. The command below prints one line, and the block after it records that line.</p>
+<pre data-lang="console"><code>$ example-tool --version</code></pre>
+<pre data-lang="ansi"><code>example-tool 1.4.0</code></pre>
+<p>Output belongs to the command above it. That is the rule the pairing check enforces, and it is why an output block that opens a lesson is reported: nothing precedes it, so a reader cannot tell what produced it.</p>
+<p>Now list the plugins the tool found. Two commands in a row are fine, and so is a single transcript that answers the second one.</p>
+<pre data-lang="console"><code>$ example-tool plugins list</code></pre>
+<pre data-lang="ansi"><code>NAME        VERSION   STATUS
+linter      0.9.2     enabled
+formatter   0.4.1     enabled</code></pre>
+<p>For the wider background, see <a href="https://docs.example.com/example-tool">the tool documentation</a>. The link checks resolve prose links like that one, and they need the network, so they run in their own tier rather than on every pull request.</p>

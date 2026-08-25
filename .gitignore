@@ -9,3 +9,8 @@ _local-mirror/
 # Copy errata.example.yaml to your content repository. A local one here is
 # only for development against a checkout in _local-mirror/.
 errata.yaml
+
+# The exception is the config of the synthetic content repository under
+# tests/fixtures/. It describes fixture content rather than real content, and
+# CI needs it, because the real content is not available there.
+!tests/fixtures/content/errata.yaml

@@ -1,0 +1,120 @@
+# Configuration for the synthetic content repository in this directory.
+#
+# errata carries no settings of its own, so its own suite has to be pointed at
+# a content repository like any other caller. Developers point it at a real
+# checkout under `_local-mirror/`. CI cannot: the courses live in a private
+# repository in another organisation. This fixture stands in for one, so the
+# tests that walk a content tree still run on every pull request.
+#
+# Keep it valid and keep it clean. The content checks must come out empty, and
+# `tests/offline/config.test.js` reads this file and edits it in memory to
+# prove that each validation rule rejects what it should.
+
+# Where the course directories live, relative to this file.
+contentRoot: courses
+
+# Findings that are known and deliberately not fixed yet. The fixture has
+# none, but the file has to exist for the plumbing to be exercised.
+knownIssuesFile: ../.errata.yaml
+
+# Domain whose published slugs build the public lesson URLs.
+primaryDomain: courses.example.com
+
+# Registry host prefixes whose image references are worth resolving.
+#
+# The fixture lessons reference no images at all. Resolving one needs the
+# network, and the network tier does not run in CI.
+registryPrefixes:
+  - registry.example.com/
+
+# Path segments under a registry host that are not container repositories. A
+# registry often serves other artifacts from the same hostname, and errata
+# would otherwise resolve them as images and report a misleading 401.
+nonImageNamespaces:
+  - java
+  - python
+
+# Age at which a digest pinned in the content stops being merely behind its
+# tag and starts being misleading.
+staleImageDays: 365
+
+# `data-lang` value -> how the block is treated.
+#
+#   shell   executable commands
+#   output  transcripts and sample output; never executable
+#   config  declarative files that should parse with a real parser
+#   source  program source in some other language
+languages:
+  console: { kind: shell }
+  bash: { kind: shell }
+  ansi: { kind: output }
+  text: { kind: output }
+  json: { kind: config, parser: json }
+  yaml: { kind: config, parser: yaml }
+  dockerfile: { kind: config, parser: dockerfile }
+  terraform: { kind: config, parser: hcl }
+  go: { kind: source }
+  python: { kind: source }
+  markdown: { kind: source }
+
+# Courses permitted to reference container images that need a login. The list
+# names the fixture course so that the setting is non-empty and typed, which is
+# what the configuration tests read it for.
+privateImages:
+  allowedCourses:
+    - Example-Course
+
+# Structural problems in the source HTML worth reporting.
+#
+# There is no count here. Any instance is a finding.
+anomalies:
+  # A <pre> with no data-lang attribute.
+  - missing-lang
+  # A <pre> with no <code> child.
+  - missing-code-element
+  # Unescaped markup inside a block, which a reader's browser parses as real
+  # markup and then drops.
+  - unescaped-markup
+
+# Checking of the links in the lesson prose.
+links:
+  # Domains you control, matched on the registrable domain so that every
+  # subdomain qualifies.
+  #
+  # This names chainguard.dev rather than the fixture's own example.com, and it
+  # has to. The verdict tests in `tests/offline/link-health.test.js` are unit
+  # tests over `judge`, and they write both sides of the rule literally: a
+  # redirect within chainguard.dev is a move to follow, and one that lands on
+  # example.com is a move to review because it leaves the domains we control.
+  # Owning example.com here would invert that second case.
+  ownedDomains:
+    - chainguard.dev
+
+  # Links that no check can reach, each with the reason.
+  skip:
+    - pattern: '^https?://(www\.)?(twitter|x)\.com/'
+      why: Serves a login wall to anything without a browser session.
+    - pattern: '^https?://localhost'
+      why: Only resolvable on the reader's own machine.
+
+# Ceilings for measurements that move without anybody touching the content.
+driftBudget:
+  # Digest-pinned references older than staleImageDays. The fixture pins none.
+  staleImageRefs: 0
+
+# Lessons that are copies of each other.
+duplication:
+  # Ignore anything shorter than this many words. Short items match each other
+  # on almost no evidence.
+  minWords: 50
+
+  # Word n-gram length. Five is the usual choice for prose.
+  shingleSize: 5
+
+  # Report a pair at or above this Jaccard score.
+  threshold: 0.80
+
+  # Elements whose text is not prose that a reader compares.
+  ignoreElements:
+    - script
+    - style
