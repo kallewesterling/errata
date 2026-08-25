@@ -7,6 +7,7 @@ import {
   anomalies,
   configFile,
   driftBudget,
+  duplication,
   knownIssuesPath,
   knownLangs,
   langTaxonomy,
@@ -157,5 +158,39 @@ describe("configuration validation", () => {
   it("rejects malformed YAML", () => {
     const result = loadConfig("contentRoot: [unclosed\n");
     expect(result.ok).toBe(false);
+  });
+
+  it("exposes the duplication settings, with ignoreElements as a set", () => {
+    expect(duplication.minWords).toBeGreaterThan(0);
+    expect(duplication.threshold).toBeGreaterThan(0);
+    expect(duplication.threshold).toBeLessThanOrEqual(1);
+    expect(duplication.shingleSize).toBeGreaterThanOrEqual(2);
+    expect(duplication.ignoreElements.has("script")).toBe(true);
+  });
+
+  it("rejects a similarity threshold outside zero to one", () => {
+    const result = loadConfig(VALID.replace(/threshold: [\d.]+/, "threshold: 1.5"));
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("duplication.threshold");
+  });
+
+  it("rejects a shingle size too small to be evidence", () => {
+    const result = loadConfig(VALID.replace(/shingleSize: \d+/, "shingleSize: 1"));
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("duplication.shingleSize");
+  });
+
+  it("rejects a non-positive minimum word count", () => {
+    const result = loadConfig(VALID.replace(/minWords: \d+/, "minWords: 0"));
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("duplication.minWords");
+  });
+
+  it("rejects ignoreElements that is not a list of element names", () => {
+    const result = loadConfig(
+      VALID.replace(/ignoreElements:\n(\s+- \w+\n)+/, "ignoreElements: true\n"),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("duplication.ignoreElements");
   });
 });

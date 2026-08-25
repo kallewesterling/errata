@@ -143,3 +143,36 @@ driftBudget:
   # the count. Sometimes deliberate: a few lessons pin an old image to
   # demonstrate a diff against a newer one.
   staleImageRefs: 21
+
+# Lessons that are copies of each other.
+#
+# Reuse here is deliberate: Painless Vulnerability Management is assembled from
+# lessons belonging to four other courses, and Securing the AI/ML Supply Chain
+# bundles the AI/ML modules. So repetition is not the finding. Two copies that
+# have drifted apart is, because it usually means an edit reached one of them
+# and not the other.
+duplication:
+  # Ignore anything shorter than this many words. Short items are mostly a
+  # heading and a sentence, and match each other on almost no evidence.
+  minWords: 50
+
+  # Word n-gram length. Five is the usual choice for prose: long enough that
+  # matching is not a coincidence, short enough to survive small edits.
+  shingleSize: 5
+
+  # Report a pair at or above this Jaccard score. At 0.80 the content yields
+  # roughly 30 pairs in sync and 25 drifted, which is a list a person can read.
+  # Lowering it starts to admit lessons that merely share a subject: two
+  # different explanations of what a CVE is score about 0.91 against each other.
+  threshold: 0.80
+
+  # Elements whose text is not prose a reader compares.
+  #
+  # 557 of the 743 content items carry a related-resources widget inside a
+  # <script>, listing sibling courses. It is supposed to differ between copies,
+  # since each names different siblings, and left in it dominates every
+  # comparison: the top matches all reduce to widget noise rather than anything
+  # an author would want to know about.
+  ignoreElements:
+    - script
+    - style

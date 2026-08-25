@@ -17,7 +17,8 @@
     "inventory": "node scripts/inventory.js",
     "check:links": "node scripts/links.js",
     "fix:links": "node scripts/links.js --fix",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "check:copies": "node scripts/duplication.js"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",

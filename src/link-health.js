@@ -168,6 +168,17 @@ export function rewriteTarget(result) {
   return `${target}#${new URL(result.url).hash.slice(1)}`;
 }
 
+/** Every finding this module can emit, for validating known-issues entries. */
+export const LINK_PROBLEM_IDS = Object.freeze([
+  "dead-link",
+  "dead-image",
+  "moved-link",
+  "moved-link-review",
+  "missing-fragment",
+  "temporary-redirect",
+  "unreachable-link",
+]);
+
 /**
  * The alt text of the first occurrence of an image, to name it in a report.
  *

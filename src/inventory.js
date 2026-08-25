@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { repoRoot } from "./config.js";
+import { duplication, repoRoot } from "./config.js";
 import { classify } from "./classify.js";
+import { sentences, shingles, visibleText, words } from "./duplication.js";
 import { extractBlocks, fingerprint } from "./extract.js";
 import { resolveContentFile } from "./integrity.js";
 import { lessonUrl, loadCourses } from "./mirror.js";
@@ -193,6 +194,56 @@ let cachedLinks = null;
 export function getLinks() {
   cachedLinks ??= buildLinkInventory();
   return cachedLinks;
+}
+
+/**
+ * Build the comparable-text inventory: one document per content item.
+ *
+ * Items shorter than the configured minimum are dropped rather than scored
+ * low. A lesson that is a heading and one sentence matches its neighbours on
+ * almost no evidence, and including them would fill the report with pairs that
+ * are similar only because there is nothing much to be similar about.
+ *
+ * @returns {import("./duplication.js").TextDoc[]}
+ */
+export function buildTextInventory() {
+  const docs = [];
+
+  for (const course of loadCourses()) {
+    for (const lesson of course.lessons) {
+      for (const item of lesson.content_items ?? []) {
+        const absFile = resolveContentFile(course.absPath, item.file);
+        if (!absFile) continue;
+
+        const relPath = path.relative(repoRoot, absFile);
+        const text = visibleText(fs.readFileSync(absFile, "utf8"));
+        const ws = words(text);
+        if (ws.length < duplication.minWords) continue;
+
+        docs.push({
+          id: `${course.dir}/${lesson.slug}/${item.id}`,
+          label: `${course.dir}/${lesson.slug}`,
+          course: course.dir,
+          lesson: lesson.slug,
+          editorRef: `${relPath}:1:1`,
+          lessonUrl: lessonUrl(course, lesson),
+          text,
+          sentences: sentences(text),
+          words: ws.length,
+          shingles: shingles(ws),
+        });
+      }
+    }
+  }
+
+  return docs;
+}
+
+let cachedTexts = null;
+/** Memoized comparable-text inventory. */
+export function getTexts() {
+  cachedTexts ??= buildTextInventory();
+  return cachedTexts;
 }
 
 /** Human-readable pointer used in assertion messages. */
