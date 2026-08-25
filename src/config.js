@@ -22,6 +22,7 @@ const TOP_LEVEL_KEYS = new Set([
   "anomalies",
   "links",
   "driftBudget",
+  "duplication",
 ]);
 
 const KINDS = new Set(["shell", "output", "config", "source"]);
@@ -105,6 +106,24 @@ function validate(raw) {
   }
   for (const key of Object.keys(raw.driftBudget ?? {})) {
     if (!REQUIRED_DRIFT_BUDGETS.includes(key)) fail(`unknown budget "driftBudget.${key}"`);
+  }
+
+  const dup = raw.duplication;
+  if (!dup || typeof dup !== "object") fail("duplication must be a mapping");
+  if (!Number.isInteger(dup.minWords) || dup.minWords <= 0) {
+    fail("duplication.minWords must be a positive integer");
+  }
+  if (!Number.isInteger(dup.shingleSize) || dup.shingleSize < 2) {
+    fail("duplication.shingleSize must be an integer of at least 2");
+  }
+  if (!Number.isFinite(dup.threshold) || dup.threshold <= 0 || dup.threshold > 1) {
+    fail("duplication.threshold must be a number above 0 and at most 1");
+  }
+  if (
+    !Array.isArray(dup.ignoreElements) ||
+    dup.ignoreElements.some((e) => typeof e !== "string")
+  ) {
+    fail("duplication.ignoreElements must be a list of element names");
   }
 
   return raw;
@@ -209,6 +228,18 @@ export function skipReason(url) {
  * checks keep a ceiling; everything else is itemized in the known-issues file.
  */
 export const driftBudget = config.driftBudget;
+
+/**
+ * Settings for finding lessons that are copies of each other.
+ *
+ * Reuse is intended here, so these tune a report rather than a pass/fail line:
+ * what counts as long enough to compare, how similar is similar, and which
+ * elements hold text a reader never compares.
+ */
+export const duplication = Object.freeze({
+  ...config.duplication,
+  ignoreElements: Object.freeze(new Set(config.duplication.ignoreElements)),
+});
 
 /**
  * The known-issues file, resolved against the content root rather than this

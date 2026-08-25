@@ -17,6 +17,7 @@ npm run test:network  # network tier: registry and link checks
 npm run test:all      # both
 npm run inventory     # summary of what was found
 npm run check:links   # links and images: dead, moved, and broken anchors
+npm run check:copies  # lessons that are copies of each other, and have drifted
 ```
 
 ## Configuration
@@ -124,6 +125,28 @@ The content repository already had `tools/check-course-image-urls`, which checks
 
 Because a bucket asset does not meaningfully move, images take the same liveness and redirect path as links but are reported as their own finding, named by their alt text, since the bucket names assets by hash and a URL alone is a poor way to identify a missing screenshot.
 
+### Repetition is the design, so drift is the finding
+
+Courses here are assembled from shared lessons. Painless Vulnerability Management is built from lessons belonging to four other courses; Securing the AI/ML Supply Chain bundles the AI/ML modules. Of 631 lessons long enough to compare, 29 pairs are word-for-word identical. A check that reported duplicates would be reporting several dozen editorial decisions.
+
+What is worth knowing is the pair that used to match and no longer does, because that is what an edit reaching one copy and missing the other looks like from outside either file. That comes to 23 pairs, which is a list a person can read.
+
+Comparison is by Jaccard similarity over five-word shingles. Single words would rank any two lessons about CVEs as the same, since they share a vocabulary; whole documents would catch only exact copies. Five words in the same order rarely coincide, and a small edit disturbs only the shingles that overlap it. The whole thing is exhaustive and quadratic, which at 631 documents means about 199,000 set intersections and a second of work — MinHash and LSH are the textbook answer to this shape of problem and would only add a sampling error to hide.
+
+Two details do most of the work. **Script elements are excluded**: 557 of the 743 content items carry a related-resources widget inside a `<script>` naming sibling courses, so it differs in every copy by design, and left in it dominates every comparison it takes part in. **Block boundaries survive normalization**, so a command with no full stop after it does not run into the sentence that follows; without that, a changed command and a rewritten paragraph arrive as one blob.
+
+### Nothing about drift fails a run
+
+A lesson written to stand alone opens differently from the same lesson inside a learning path, and says "in this course" where its twin says "in this module". That is correct, and indistinguishable by machine from a fix that landed on one side only. So this reports and stops, in the same spirit as `moved-link-review`.
+
+The one distinction worth drawing is whether a difference touches something executable. Two copies whose *prose* diverges are usually fine; two copies whose *commands* diverge are the case least likely to be intentional and the most expensive to meet as a reader. Those are called out by name, and still do not fail.
+
+### The linkage map may be the more useful half
+
+Grouping identical code across courses answers a question that is otherwise very hard to ask: if this command is wrong, where else is it wrong? 103 block texts appear in more than one course.
+
+Blocks earn a place by carrying detail that can rot — more than one line, or one long enough to hold a URL or a pinned version. `$ apk update` appears in four courses and does not matter, because there is nothing in it to get out of step. `$ curl -o chainctl "https://dl.enforce.dev/chainctl/latest/..."` appears in three and very much does.
+
 ### A link can rot in three different ways
 
 Status-code checking alone answers only the first of these, which is how links quietly decay while every automated check passes:
@@ -222,7 +245,7 @@ Reports are written to stderr and the assertion message is kept to one line. The
 
 ## Test tiers
 
-**Offline** (`tests/offline/`, no network) — extractor and pairing unit tests; every block has a known `data-lang`; JSON, YAML, Dockerfile and Terraform blocks parse or are recognized excerpts; shell prompt style is consistent; output blocks pair with a command and are never marked runnable; metadata paths match disk.
+**Offline** (`tests/offline/`, no network) — extractor and pairing unit tests; every block has a known `data-lang`; JSON, YAML, Dockerfile and Terraform blocks parse or are recognized excerpts; shell prompt style is consistent; output blocks pair with a command and are never marked runnable; metadata paths match disk; lessons that are copies of each other are reported, never failed.
 
 **Network** (`tests/network/`) — container image references resolve against the registry; images needing auth appear only in allowlisted courses; URLs that commands fetch are live; prose links resolve, with their anchors; every `<img src>` loads; digest pins are checked for age.
 
@@ -262,6 +285,16 @@ Of 646 unique prose links, 219 are on Chainguard-owned domains. Those break down
 - **8 course links are genuinely dead**, seven of them lessons under `partner-guide-to-chainguard-pricing`. The path root still serves 200 and the course under it does not, and this site answers a login gate with a 302 rather than a 404, so these are gone rather than gated.
 - **2 links point at headings that no longer exist.** Both survived years of link checking because the page returns 200; only reading the document for the anchor finds them.
 
+### Copies
+
+29 lesson pairs are identical, 23 have drifted, and 2 of those differ in a command. Three of the drifts look like edits that reached one copy and missed the other:
+
+- **A command that gained a flag in one place only.** One copy of the debug lesson runs `docker debug -it nginx-container`, the other `docker debug nginx-container`.
+- **A caveat added to one copy.** In Handling Missing Dependencies, one copy was updated to `wolfi-base`, gained a note about organisation access and an extra command; the other still says `chainguard-base` with neither.
+- **A rename applied unevenly.** Containers Overview differs by one letter: "a new version of a Chainguard Container is available" against "a Chainguard**s** is available". Two files carry the ungrammatical form.
+
+A fourth turned up while comparing the resources widget rather than the prose. `Containers-Containers-Containers/60-How-to-Debug-Chainguard-Images` has `description: "&mdash;Chainguard Containers Documentation"` inside a `<script>`, where entities are not decoded, so it renders literally on the page. Its sibling copy is clean.
+
 ### Images
 
 All 226 unique images, across 309 occurrences, resolve. Every one is on the GCS bucket, none are relative, and there are no `srcset`, `poster` or inline-CSS `url()` references to worry about. This is the answer worth having on record: the bucket is healthy, and now the check watches what the lessons display rather than what a migration wrote down.
@@ -284,6 +317,73 @@ Two conventions for showing output coexist: a separate `ansi` block (120 blocks)
 ```bash
 ERRATA_ROOT=/path/to/courses npm test
 ```
+
+## Working with Syncjar
+
+[Syncjar](https://github.com/kallewesterling/syncjar) moves content between Skilljar and git. Errata reads what lands in git and never talks to Skilljar at all. The division is clean everywhere except link checking, where Syncjar has a script errata supersedes — see below.
+
+The two meet at one place: a directory of courses, which Syncjar names `COURSE_CONTENT_PATH` and errata names `ERRATA_ROOT`.
+
+Point both at the same directory and the loop is pull, check, fix, check, push.
+
+```bash
+# 1. Bring Skilljar into git.
+cd ~/syncjar
+COURSE_CONTENT_PATH=~/courses npm run pull
+
+# 2. Check what arrived. Nothing here needs the network except the last two.
+cd ~/errata
+export ERRATA_ROOT=~/courses/courses
+npm run test:offline          # structure, parsing, pairing, metadata
+npm run check:copies          # lessons that are copies, and have drifted
+npm run check:links           # every link and image, against the live web
+
+# 3. Fix. Some of it is mechanical.
+npm run fix:links -- --dry-run
+npm run fix:links
+
+# 4. Confirm, then send it back.
+npm run test:offline
+cd ~/syncjar
+COURSE_CONTENT_PATH=~/courses npm run push -- --dry-run
+COURSE_CONTENT_PATH=~/courses npm run push
+```
+
+`ERRATA_ROOT` points one level deeper than `COURSE_CONTENT_PATH`, at the `courses/` directory inside the content repository rather than the repository root. That is the layout of this particular content repository rather than anything either tool requires; `contentRoot` in `errata.yaml` records it.
+
+### This supersedes Syncjar's `check:links`
+
+Syncjar has a script of the same name. It is not checking a different population: `public/courses/` is a copy of the same lessons, written by `npm run generate:courses` from the same `lessons-meta.json`. It is the same links, read from a gitignored duplicate that only exists after a preview build.
+
+It cannot see the findings that matter most here. It follows redirects without recording them, so the 101 permanently moved links in this content all answer 200 and look healthy. It never fetches a page body, so a `#anchor` pointing at a heading that no longer exists is invisible. It sends only HEAD, so a host that refuses HEAD is reported as broken. Every exception collapses into `status: 'ERROR'`, which makes a timeout indistinguishable from a domain that no longer resolves.
+
+It also passes `timeout: 5000` to `node-fetch`, which was a v2 option; the dependency is `^3.3.2`, where that key is ignored and an unresponsive host has no deadline at all. The report it writes, `public/data/link-report.json`, is gitignored, and nothing in the repository reads it.
+
+Run errata's instead. If the preview UI ever wants a report, `npm run check:links -- --json` produces one.
+
+### Check before you push, not after
+
+Skilljar is the published site, so anything wrong that reaches it is wrong in front of learners until the next round trip. Everything errata does works on local files, which makes the check cheap to run between `pull` and `push`.
+
+This also matters for `fix:links`. It edits the `href` text in place instead of reserializing the HTML, specifically so that `npm run push -- --dry-run` shows you 159 changed URLs rather than 51 files of reformatted markup. A rewriter that regenerated the document would produce a diff nobody could read, and Syncjar shows you that diff before it uploads anything.
+
+### Notes survive the round trip, HTML comments may not
+
+Content goes through Skilljar's editor, which can rewrite markup, so an HTML comment left in a lesson is not guaranteed to come back. `.errata.yaml` lives at the content root instead. Syncjar never uploads it, and it is outside the `[A-Z]*/lessons/` glob the documentation export walks, so it survives both directions. Record accepted findings and standing notes there rather than in the lessons.
+
+### Editing a shared lesson
+
+Courses here reuse lessons, so a change often belongs in more than one place. Before editing, ask what else carries the same text:
+
+```bash
+npm run check:copies -- --map
+```
+
+After editing, run `npm run check:copies` to see whether the copies you did not touch have now drifted from the one you did.
+
+### In CI
+
+The daily sync job opens a pull request titled "Sync Skilljar content" on `chore/sync-skilljar`. That pull request is the natural place to run errata, because it is the moment content enters git and the last moment before anyone builds on it. The link check runs on its own weekly schedule instead, since links rot on the web's timetable rather than on an author's.
 
 ## Inventory CLI
 
@@ -319,9 +419,20 @@ npm run fix:links -- --dry-run           # show what would change
 
 Both commands exit non-zero only on findings that need a person.
 
-### What this replaces in the content repository
+### Copies CLI
 
-Two tools, both of which check whether a URL answers.
+```bash
+npm run check:copies                     # drifted pairs, with the differences
+npm run check:copies -- --map            # what a change here also changes
+npm run check:copies -- --all            # include pairs that are still in sync
+npm run check:copies -- --json           # machine-readable
+```
+
+Always exits zero. Drift here is a question for an author, and the map is not a finding at all.
+
+### What this replaces
+
+Three scripts, all of which check whether a URL answers. Two live in the content repository; the third is Syncjar's `check:links`, covered under [Working with Syncjar](#this-supersedes-syncjars-checklinks).
 
 `tools/check-course-image-urls` HEAD-requests every asset in the image manifest and exits non-zero if any fail. Errata covers it by checking the images the lessons actually reference, and separates a timed-out request from a genuinely missing asset, which that tool reports identically.
 
@@ -348,6 +459,7 @@ src/
   mirror.js         source adapter: courses, lessons, public URLs
   extract.js        parse5 locate + raw slice, anomaly detection
   prose-links.js    <a href> and <img src>, taken from the source text
+  duplication.js    visible text, shingles, drift between copies
   classify.js       kind mapping, shell splitting, image and URL detection
   pairing.js        links output blocks to the command that produced them
   warnings.js       offline rules comparing a command against its own output

@@ -16,7 +16,9 @@ import {
   checkContentPaths,
   findUnreferencedContentFiles,
 } from "./integrity.js";
+import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
 import { indexIssues, loadKnownIssues } from "./known-issues.js";
+import { LINK_PROBLEM_IDS } from "./link-health.js";
 import { blockItem, style } from "./report.js";
 import { REMEDIATION, warningItem } from "./warnings.js";
 
@@ -293,8 +295,28 @@ export function collectProblems(blocks = getInventory()) {
  *
  * @param {ReturnType<typeof getInventory>} [blocks]
  */
-export function inspect(blocks = getInventory()) {
-  const problems = collectProblems(blocks);
+/**
+ * Findings that belong to a tier other than this one.
+ *
+ * The known-issues file is a single file describing every check, while any one
+ * run only knows about some of them. Without this list, an entry accepting a
+ * dead link would be reported as naming a check that does not exist, purely
+ * because the offline run has never heard of link checking.
+ */
+const OTHER_TIER_PROBLEM_IDS = new Set([
+  ...LINK_PROBLEM_IDS,
+  ...DUPLICATION_PROBLEM_IDS,
+]);
+
+/**
+ * Match a set of problems against the known-issues file.
+ *
+ * Splits each problem's items into those still open and those accepted, and
+ * reports entries that no longer describe reality.
+ *
+ * @param {Problem[]} problems
+ */
+export function applyKnownIssues(problems) {
   const { issues, notes } = loadKnownIssues();
   const index = indexIssues(issues);
   const matched = new Set();
@@ -328,14 +350,29 @@ export function inspect(blocks = getInventory()) {
     problem.accepted = accepted;
   }
 
-  const known = new Set(problems.map((p) => p.id));
+  // Two different questions, and conflating them misreports both. An entry is
+  // resolved only if the check that owns it ran here and did not find it. An
+  // entry naming a check that exists but did not run belongs to another tier
+  // and is nobody's business right now; one naming no check at all is a typo.
+  const ranHere = new Set(problems.map((p) => p.id));
   const resolved = issues.filter(
     (issue) =>
-      known.has(issue.problem) && !matched.has(`${issue.problem}\u0000${issue.key}`),
+      ranHere.has(issue.problem) && !matched.has(`${issue.problem}\u0000${issue.key}`),
   );
-  const unknown = issues.filter((issue) => !known.has(issue.problem));
+  const unknown = issues.filter(
+    (issue) => !ranHere.has(issue.problem) && !OTHER_TIER_PROBLEM_IDS.has(issue.problem),
+  );
 
   return { problems, stale, resolved, unknown, notes };
+}
+
+/**
+ * Collect the offline problems and apply the known-issues file to them.
+ *
+ * @param {import("./inventory.js").CodeBlock[]} [blocks]
+ */
+export function inspect(blocks = getInventory()) {
+  return applyKnownIssues(collectProblems(blocks));
 }
 
 /** Problems with findings nobody has accepted, which is what fails the suite. */
