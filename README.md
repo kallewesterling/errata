@@ -113,8 +113,8 @@ List the courses that teach with private images in `privateImages.allowedCourses
 ```yaml
 privateImages:
   allowedCourses:
-    # Builds and pulls yq from the package repository while it teaches packaging.
-    - Build-Your-First-Chainguard-Container
+    # Builds and pulls a private package while it teaches packaging.
+    - Build-Your-First-Container
 ```
 
 Errata checks this list in two directions. A course on the list that uses no private image also fails. An entry cannot outlive its reason.
@@ -123,7 +123,7 @@ Errata checks this list in two directions. A course on the list that uses no pri
 
 `links.ownedDomains` lists the domains that you control. Errata rewrites a moved link only when the domain is on this list. A redirect from your own site is a decision by a person you can ask. A redirect from another site can be a URL shortener, a test, or a consent page.
 
-Errata matches the registrable domain. Every subdomain of `chainguard.dev` qualifies. The domain `notchainguard.dev` does not.
+Errata matches the registrable domain. Every subdomain of `example.com` qualifies. The domain `notexample.com` does not.
 
 `links.ownedDomains` is not the same setting as `primaryDomain`. `primaryDomain` names the one site that supplies the public lesson URLs.
 

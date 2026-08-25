@@ -93,7 +93,7 @@ Most URLs inside a code block are data, not links. Examples include OIDC issuer 
 
 The network tier therefore checks only a URL that a command passes to a fetch. It also skips `localhost`.
 
-The same rule applies to image references. The registry host also serves its own HTTP API and the Chainguard Libraries endpoints, so `src/classify.js` removes those before errata resolves anything.
+The same rule applies to image references. A registry host usually serves its own HTTP API, and often language-package endpoints beside it, so `src/classify.js` removes those before errata resolves anything. Which paths those are is a property of the registry, so it is the `nonImageNamespaces` setting rather than a rule in the code.
 
 ### A prose link is a different population from a URL in code
 
@@ -123,7 +123,7 @@ A check that reads only the status code answers the first question. This is how 
 | The page moved, and answers with a 301. | The link looks healthy. |
 | The page is fine, but the `#anchor` is gone. | The link looks healthy. |
 
-In this content the second case is the common one. 101 of the 219 links to Chainguard domains point at a page that moved permanently. The previous checker reported none of them.
+The second case is usually the common one. In the courses this was built against, it accounted for just under half of all links to domains the project owned, and the previous checker reported none of them.
 
 Two details make this harder than it looks.
 
@@ -210,7 +210,7 @@ Each rule stays quiet unless both sides make a claim and the claims disagree. Ou
 
 The obvious check has no value here. It asks whether a pin still matches what the tag serves. These images rebuild continuously, so 21 of the 23 pins are behind their tag, and that fact says nothing.
 
-The useful measure is the distance behind. `src/registry.js` reads the build date from the image config blob. Errata can then report a pin as "built 2023-05-12, 1201 days old" instead of a boolean with no meaning. Errata flags anything older than `staleImageDays`, which is one year, and ranks the report by age.
+The useful measure is the distance behind. `src/registry.js` reads the build date from the image config blob. Errata can then report a pin as "built 2024-01-30, 412 days old" instead of a boolean with no meaning. Errata flags anything older than `staleImageDays`, which is one year, and ranks the report by age.
 
 This is a warning, not a failure, for a second reason. A few lessons pin an old image on purpose, to show a difference against a newer one. A pin that stops resolving is a different matter, and the reference tests fail for it.
 
@@ -247,9 +247,9 @@ Each report answers three questions in this order. A finding without a location 
   data-lang="ansi" means output only. These carry a shell prompt, usually a
   decorated one such as > or ->, rather than the $ used elsewhere, so the
   command a reader needs to run is buried in a block styled as a transcript.
-  1. > docker pull cgr.dev/chainguard/wolfi-base
-     _local-mirror/courses/Crush-Your-CVEs/lessons/20-.../content-3chz.html:34:29
-     https://courses.chainguard.dev/crush-your-cves/catching-cves-before-production
+  1. > docker pull registry.example.com/base/alpine
+     courses/Example-Course/lessons/20-Getting-Started/content-3chz.html:34:29
+     https://courses.example.com/example-course/getting-started
   Fix: Move the command into its own <pre data-lang="console"> block above
   the output, and use the "$ " prompt to match the rest of the content.
 ```
@@ -260,76 +260,28 @@ The count follows the title. It does not lead the title, because "1 blocks with"
 
 Errata writes each report to stderr and keeps the assertion message to one line. The runner strips ANSI codes from an assertion message, and renders a long message inside a diff view that breaks the layout.
 
-## What errata found in the content
+## What errata finds in real content
 
-The content has 762 code blocks, in 121 files, across 29 of the 53 courses. The other 24 courses contain no code. A raw scan for `<pre>` confirmed this, rather than an assumption. All 68 container image references resolve.
+The findings for a given body of content belong with that content, not here.
+They are dated, they change whenever an author edits a lesson, and they are
+about one project rather than about the tool.
 
-The counts in this section come from a run against the `chore/code-block-content-fixes` branch. They move when an author edits the content.
+For the courses this was built against, that record is `docs/errata-findings.md`
+in the content repository. To produce your own, run `npm run inventory --
+--problems --all`, `npm run check:links` and `npm run check:copies`.
 
-### Errors that are fixed
+Two results are worth keeping here, because they changed errata itself rather
+than the content:
 
-These repairs are on the `chore/code-block-content-fixes` branch of the content repository.
+- **A container prompt is a prompt.** Blocks that use `nginx:/#` show exactly
+  what a reader sees after attaching to a container. Reporting those as
+  promptless would have made the content worse to fix than to leave.
+- **The `#` character opens a comment, not a root shell.** Reading `# Install
+  (macOS)` as a root prompt invented commands that no reader is meant to run.
 
-- **A `<path_to_dockerfile>` placeholder that no reader saw.** A `<pre>` element is not a raw-text element. The browser therefore read the placeholder as an unknown tag, and drew nothing. The DFC help text showed `dfc` and then blank space. A scan of the whole repository for non-HTML tags confirmed that this was the only case.
-- **A YAML block indented with tabs**, in Custom Assembly through the Chainguard API. YAML forbids a tab as indentation, so a copy of this block into `build.yaml` produced a parse error. Three other blocks contain tabs, and errata leaves them alone. They are Go and JSON, where a tab is legal.
-- **A `<pre>` with no `data-lang` and no `<code>` child.** The other twelve blocks in that course all follow the convention.
-- **Three `ansi` blocks that opened with a command** behind a decorated prompt. Each one is now a `console` command block and an `ansi` output block.
-- **Editorial text pasted inside a Grype transcript**, in two courses. Two sentences and two output lines sat inside the `<pre>` element, and the same text follows it as real markup.
-- **Two shell commands with no `$` prompt.** The command directly above them, in the same list, has one.
-- **A prompt shown as a command.** A lesson says "you should receive a prompt", then shows `#` in a `console` block. That block tells the reader to type the character. The block is now `ansi`.
+Two thirds of the first "promptless shell block" findings were faults in errata,
+not in the content. Only real content shows that.
 
-### Errors that need an author
-
-- **A spliced Grype transcript**, in the AIML and Securing-the-AIML courses. It joins the end of a scan of the PyTorch runtime image onto a second `grype pytorch/pytorch` run against `:latest`. The package counts and CVE counts in the text come from the second run. An author must run Grype again and restate those numbers.
-- **Output captured from a different run**, in Getting Started With Chainguard Containers, in the lesson How To Update Containers. The command runs `chainctl images diff` on the valkey digests `ef876a...` and `a53bd8...`. The text says "this responded with the following output". The output reports `408e8f...` and `550bd0...` instead.
-- **Every digest pin in the content is more than a year old.** All 21 resolvable pins pass the one-year limit. The youngest is 525 days old. Five are more than three years old, and the oldest was built on 2023-05-12. The package versions and CVE counts in the text around them describe those builds.
-- **Two content files that nothing references**, in Tailoring-the-Chainguard-Message. They are placeholder lessons, and no `lessons-meta.json` points at them. An author must connect them or delete them.
-- **Three output blocks with no command to attach to.** The command that produced the output is genuinely implicit. It is the output of a build, or of an agent session that the block above drives.
-
-### Links
-
-The content has 650 unique prose links. 219 of them are on Chainguard domains. They divide as follows:
-
-| Verdict | Count | Meaning |
-|---|---|---|
-| ok | 92 | The page answers, and any anchor exists. |
-| moved | 101 | The page moved permanently. Errata can rewrite the link. |
-| review | 8 | The page moved, but a person must approve the destination. |
-| dead | 10 | The page is gone. |
-| temporary | 4 | The page answers with a 302 or a 307. Errata never rewrites these. |
-| unreachable | 2 | The request failed. This is not the same as a missing page. |
-| fragment | 2 | The page answers, but the `#anchor` is gone. |
-
-- **The documentation site reorganized under the courses.** `chainguard-images` became `containers`. `open-source/melange` became `open-source/build-tools/melange`. `chainguard/administration` became `platform/administration`. `chainguard/migration` became `get-started/migration`. Every one of these still answers a request, so nothing looked wrong. `npm run fix:links` rewrites all 101 links, in 51 files, and carries the fragments across.
-- **Ten links are dead.** Eight are on `courses.chainguard.dev`, and all eight are lessons under `partner-guide-to-chainguard-pricing`. The root of that path still serves a 200 response, and the course under it does not. This site answers a login gate with a 302 rather than a 404, so these pages are gone rather than gated. The other two are on `edu.chainguard.dev`.
-- **Two links point at headings that no longer exist.** Both survived years of link checking, because the page returns a 200 response. Only a check that reads the document for the anchor finds them.
-
-### Images
-
-All 226 unique images resolve, across 309 occurrences. Every one is on the GCS bucket. None are relative. There are no `srcset`, `poster`, or inline-CSS `url()` references.
-
-This result is worth a record. The bucket is healthy, and the check now watches what the lessons show instead of what a migration wrote down.
-
-### Copies
-
-29 lesson pairs are identical. 23 pairs have drifted, and 2 of those differ in a command. Three of the drifts look like an edit that reached one copy and missed the other.
-
-- **A command that gained a flag in one place only.** One copy of the debug lesson runs `docker debug -it nginx-container`. The other runs `docker debug nginx-container`.
-- **A caveat added to one copy.** In Handling Missing Dependencies, one copy moved to `wolfi-base`. It also gained a note about organization access, and an extra command. The other copy still says `chainguard-base`, and has neither addition.
-- **A rename applied unevenly.** Containers Overview differs by one letter. One copy says "a new version of a Chainguard Container is available". The other says "a Chainguard**s** is available". Two files carry the ungrammatical form.
-
-A fourth finding came from the resources widget rather than the text. `Containers-Containers-Containers/60-How-to-Debug-Chainguard-Images` has `description: "&mdash;Chainguard Containers Documentation"` inside a `<script>` element. Entities do not decode there, so the page shows the entity itself. The sibling copy is clean.
-
-### What the real content changed in errata
-
-Two thirds of the "promptless shell block" findings were faults in errata. Only real content shows this kind of error.
-
-- **A container prompt is a prompt.** Six blocks use `nginx:/#`. That is what the reader sees after an attach to the container, and it is the point of the lesson. A request to replace it with `$` would make the content worse.
-- **A script is not a transcript.** One block is a `#!/usr/bin/env bash` file for the reader to save. It has no prompt by design.
-- **The `#` character opens a comment, not a root shell.** All 21 occurrences introduce a comment such as `# Install (macOS)`. Errata read them as root prompts, and invented 16 commands that no reader must run.
-- **A bare prompt is not a hidden command.** A `#` on its own is a prompt on display. The mislabeled-output rule now needs content after the marker.
-
-The content uses two conventions for output. 116 blocks put the output in a separate `ansi` block. 48 blocks put the output inside the `console` block. Errata recognizes both, and treats neither as an error.
 
 ## Why errata replaces the check:links script in Syncjar
 
