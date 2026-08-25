@@ -15,6 +15,8 @@
     "test:network": "vitest run --project network",
     "test:all": "vitest run",
     "inventory": "node scripts/inventory.js",
+    "check:links": "node scripts/links.js",
+    "fix:links": "node scripts/links.js --fix",
     "typecheck": "tsc"
   },
   "devDependencies": {

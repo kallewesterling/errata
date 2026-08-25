@@ -6,6 +6,7 @@ import { extractBlocks, fingerprint } from "./extract.js";
 import { resolveContentFile } from "./integrity.js";
 import { lessonUrl, loadCourses } from "./mirror.js";
 import { linkBlocks } from "./pairing.js";
+import { extractImages, extractLinks } from "./prose-links.js";
 import { collectWarnings } from "./warnings.js";
 
 /**
@@ -110,6 +111,88 @@ let cached = null;
 export function getInventory() {
   cached ??= buildInventory();
   return cached;
+}
+
+/**
+ * @typedef {object} ProseLink
+ * @property {string} id           Stable composite identity.
+ * @property {string} fingerprint  Hash of the URL, so an edited link expires
+ *   any known-issues entry that accepted the old one.
+ * @property {string} url
+ * @property {string} rawHref
+ * @property {"href"|"src"} attr
+ * @property {"link"|"image"} kind  What the page does with it.
+ * @property {string} text         Link or alt text, for recognizing it.
+ * @property {import("./prose-links.js").RawLink["scheme"]} scheme
+ * @property {import("./extract.js").SourceLocation} source
+ * @property {string} editorRef
+ * @property {string|null} lessonUrl  Public lesson URL the link appears on.
+ * @property {{dir: string, id: string|null, title: string}} course
+ * @property {{id: string, slug: string, title: string}} lesson
+ * @property {{id: string, order: number}} contentItem
+ */
+
+/**
+ * Build the inventory of everything lesson prose points at: `<a href>` and
+ * `<img src>`.
+ *
+ * Kept separate from the block inventory rather than folded into it because
+ * the two answer different questions and are checked by different tiers. An
+ * occurrence is recorded per site: the same URL appearing in nine lessons is
+ * nine entries here, and deduplication happens at check time so that one
+ * network request can report back to every place that needs fixing.
+ *
+ * @returns {ProseLink[]}
+ */
+export function buildLinkInventory() {
+  const found = [];
+
+  for (const course of loadCourses()) {
+    for (const lesson of course.lessons) {
+      for (const item of lesson.content_items ?? []) {
+        const absFile = resolveContentFile(course.absPath, item.file);
+        if (!absFile) continue;
+
+        const html = fs.readFileSync(absFile, "utf8");
+        const relPath = path.relative(repoRoot, absFile);
+
+        const kinds = /** @type {const} */ ([
+          { kind: "link", raws: extractLinks(html, relPath) },
+          { kind: "image", raws: extractImages(html, relPath) },
+        ]);
+
+        for (const { kind, raws } of kinds) {
+          for (const raw of raws) {
+            found.push({
+              id: `${course.dir}/${lesson.slug}/${item.id}#${kind}${raw.ordinal}`,
+              fingerprint: fingerprint(raw.url),
+              url: raw.url,
+              rawHref: raw.rawHref,
+              attr: raw.attr,
+              kind,
+              text: raw.text,
+              scheme: raw.scheme,
+              source: raw.source,
+              editorRef: `${relPath}:${raw.source.line}:${raw.source.column}`,
+              lessonUrl: lessonUrl(course, lesson),
+              course: { dir: course.dir, id: course.id, title: course.title },
+              lesson: { id: lesson.id, slug: lesson.slug, title: lesson.title },
+              contentItem: { id: item.id, order: item.order },
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return found;
+}
+
+let cachedLinks = null;
+/** Memoized inventory of prose links and images. */
+export function getLinks() {
+  cachedLinks ??= buildLinkInventory();
+  return cachedLinks;
 }
 
 /** Human-readable pointer used in assertion messages. */
