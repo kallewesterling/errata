@@ -97,6 +97,39 @@ anomalies:
   # markup and drops.
   - unescaped-markup
 
+# Checking of the links in lesson prose.
+links:
+  # Domains treated as ours, matched on the registrable domain so every
+  # subdomain is included: edu.chainguard.dev, images.chainguard.dev and the
+  # rest all qualify.
+  #
+  # This is not the same idea as primaryDomain, which names the one site whose
+  # slugs build public lesson URLs. This list answers a different question:
+  # whose redirects do we trust enough to rewrite content against. A 301 from a
+  # site we run is a considered decision by someone reachable; a 301 from a
+  # third party is a stranger's URL shortener, an A/B test, or a consent wall.
+  ownedDomains:
+    - chainguard.dev
+
+  # Links no check can reach, with the reason it cannot.
+  #
+  # Every entry needs a `why`. An unexplained skip is indistinguishable from a
+  # broken link somebody gave up on, and this is the file where that mistake
+  # would be permanent -- unlike the known-issues file, nothing here expires.
+  skip:
+    - pattern: 'github\.com/chainguard-dev/internal'
+      why: Private repository; anonymous requests get a 404 that means no access.
+    - pattern: 'github\.com/chainguard-dev/extra-packages'
+      why: Private repository, as above.
+    - pattern: 'github\.com/chainguard-dev/package-version-metadata'
+      why: Private repository, as above.
+    - pattern: '^https?://(www\.)?(twitter|x)\.com/'
+      why: Serves a login wall to anything without a browser session.
+    - pattern: '^https?://0\.0\.0\.0'
+      why: Loopback address in a worked example; only resolvable on the reader's machine.
+    - pattern: '^https?://localhost'
+      why: As above.
+
 # Ceilings for measurements that move without anyone touching the content.
 #
 # These are the one case a known-issues entry cannot express. An entry pins the

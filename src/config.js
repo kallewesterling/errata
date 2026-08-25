@@ -20,6 +20,7 @@ const TOP_LEVEL_KEYS = new Set([
   "languages",
   "privateImages",
   "anomalies",
+  "links",
   "driftBudget",
 ]);
 
@@ -77,6 +78,23 @@ function validate(raw) {
 
   if (!Array.isArray(raw.anomalies) || raw.anomalies.some((a) => typeof a !== "string")) {
     fail("anomalies must be a list of anomaly names");
+  }
+
+  const owned = raw.links?.ownedDomains;
+  if (!Array.isArray(owned) || owned.length === 0 || owned.some((d) => typeof d !== "string")) {
+    fail("links.ownedDomains must be a non-empty list of domain names");
+  }
+
+  if (!Array.isArray(raw.links?.skip)) fail("links.skip must be a list");
+  for (const [i, entry] of raw.links.skip.entries()) {
+    if (!entry || typeof entry.pattern !== "string" || typeof entry.why !== "string") {
+      fail(`links.skip[${i}] must have a "pattern" and a "why"`);
+    }
+    try {
+      new RegExp(entry.pattern);
+    } catch (err) {
+      fail(`links.skip[${i}].pattern is not a valid regular expression: ${err.message}`);
+    }
   }
 
   for (const key of REQUIRED_DRIFT_BUDGETS) {
@@ -145,6 +163,43 @@ export const privateImageAllowlist = Object.freeze(
 
 /** Structural anomalies worth reporting on. Any instance is a finding. */
 export const anomalies = config.anomalies;
+
+/** Domains whose redirects are trusted enough to rewrite content against. */
+export const ownedDomains = Object.freeze([...config.links.ownedDomains]);
+
+/** Links that cannot be checked, each paired with the reason. */
+export const linkSkips = Object.freeze(
+  config.links.skip.map((entry) => ({
+    pattern: entry.pattern,
+    why: entry.why,
+    re: new RegExp(entry.pattern),
+  })),
+);
+
+/**
+ * True when a URL sits on a domain we control, including any subdomain.
+ *
+ * Compared on labels rather than with a suffix test, so `notchainguard.dev`
+ * cannot pass by ending in the same characters.
+ *
+ * @param {string} url
+ */
+export function isOwnedDomain(url) {
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return ownedDomains.some(
+    (domain) => host === domain.toLowerCase() || host.endsWith(`.${domain.toLowerCase()}`),
+  );
+}
+
+/** The skip entry matching this URL, or undefined when it should be checked. */
+export function skipReason(url) {
+  return linkSkips.find((entry) => entry.re.test(url));
+}
 
 /**
  * Ceilings for measurements that drift on their own.

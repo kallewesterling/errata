@@ -6,7 +6,7 @@ An *erratum* is a mistake in something already published, which is what these ar
 
 It runs alongside [Syncjar](https://github.com/kallewesterling/syncjar), which is what puts the content in git in the first place.
 
-Course content stores code as `<pre data-lang="{language}"><code>…</code></pre>`. This tool builds an inventory of those blocks — each one tied to its course, lesson, file, and line — and then runs assertions over that inventory.
+Course content stores code as `<pre data-lang="{language}"><code>…</code></pre>`. This tool builds an inventory of those blocks — each one tied to its course, lesson, file, and line — and then runs assertions over that inventory. It does the same for the links in lesson prose, which rot in their own ways.
 
 ## Quick start
 
@@ -16,11 +16,12 @@ npm test              # offline tier, ~1s, no network
 npm run test:network  # network tier: registry and link checks
 npm run test:all      # both
 npm run inventory     # summary of what was found
+npm run check:links   # prose links: dead, moved, and broken anchors
 ```
 
 ## Configuration
 
-Everything tunable lives in [`errata.yaml`](errata.yaml): content root, language taxonomy, the stale-image threshold, and the private image allowlist. `src/config.js` only loads and validates it.
+Everything tunable lives in [`errata.yaml`](errata.yaml): content root, language taxonomy, the stale-image threshold, the private image allowlist, and which domains and links the link checker trusts or skips. `src/config.js` only loads and validates it.
 
 Which findings are currently accepted is a separate question, kept in `.errata.yaml` at the content root rather than here, for the reasons in [Known issues are named and dated](#known-issues-are-named-and-dated-not-counted).
 
@@ -45,6 +46,10 @@ privateImages:
 ```
 
 The allowlist is checked in both directions — a course listed here that no longer references a private image also fails, so entries don't outlive their reason.
+
+### Owned domains
+
+`links.ownedDomains` is not the same idea as `primaryDomain`, which names the one site whose slugs build public lesson URLs. This list answers a different question: whose redirects do we trust enough to rewrite content against. A 301 from a site we run is a considered decision by someone reachable; a 301 from a third party is a stranger's URL shortener, an A/B test, or a consent wall. Matching is on the registrable domain, so every subdomain qualifies and `notchainguard.dev` does not.
 
 ## Design
 
@@ -106,6 +111,34 @@ Documentation quotes fragments constantly: one element of an array, the body of 
 Most URLs inside code blocks are data, not links — OIDC issuer identities, SBOM document namespaces, APK repository roots, API endpoints in sample output. Fetching them produces confident-looking false positives. The network tier checks only URLs passed to a fetching command, and skips `localhost`.
 
 The same applies to image references: the registry host also serves its own HTTP API and the Chainguard Libraries endpoints, so `src/classify.js` filters those out before anything is resolved.
+
+### Prose links are a different population from code URLs
+
+An `<a href>` in prose is a promise to the reader that there is something at the other end, so unlike a URL in a code block, every one is worth checking. `src/prose-links.js` extracts them with the same care `src/extract.js` gives code: located with a parser, but with the href recovered from the source text, because the parser decodes entities and a rewriter handed `?a=1&b=2` would silently fail to find `?a=1&amp;b=2` in the file.
+
+### A link can rot in three different ways
+
+Status-code checking alone answers only the first of these, which is how links quietly decay while every automated check passes:
+
+| What is wrong | What a 404-only check sees |
+|---|---|
+| the page is gone | caught |
+| the page moved, and answers with a 301 | looks perfectly healthy |
+| the page is fine but the `#anchor` is gone | looks perfectly healthy |
+
+Against the current content the second case dominates: **101 of 219 links to Chainguard-owned domains point at a page that has permanently moved**, none of which the previous checker ever reported.
+
+Two traps make this harder than it looks. A fragment is never sent to a server, so a response URL can never carry one — comparing with the fragment attached reports every fragment link as relocated. And the same fact means the naive rewrite *deletes* every `#section` it touches, leaving a link that still resolves while the sentence around it goes on promising a section the reader is no longer taken to. `comparable()` handles the first, `rewriteTarget()` the second.
+
+### Which redirects may be applied without a person
+
+A 301 is authoritative about where a page went, but not every 301 is a page move: sites also use them to sweep retired sections onto a landing page. Following one of those turns a precise reference into a vague one *and reports success*, which is worse than leaving it alone.
+
+`src/link-health.js` applies a redirect only when the page kept its own name — the last path segment is unchanged. Whole sections get renamed around a page without the page itself changing, and those are the moves worth applying in bulk. Where the name did change, the destination is held back if it is an ancestor of some other page we have seen, which is how a section index is told apart from a page without hardcoding anything about the site.
+
+Counting how many links share a destination is deliberately *not* a signal. After a reorganization several old addresses legitimately resolve to one new page, and treating that as suspicious held back exactly the links most worth fixing.
+
+On the current content this leaves 101 rewritten automatically and 8 held for a person, each of which is a real judgement call — a retired comparison page swept into its section index, a blog post collapsed onto the blog index, one page redirecting to the site root.
 
 ### Discrepancies are warnings, and severity is a separate axis
 
@@ -183,7 +216,9 @@ Reports are written to stderr and the assertion message is kept to one line. The
 
 **Offline** (`tests/offline/`, no network) — extractor and pairing unit tests; every block has a known `data-lang`; JSON, YAML, Dockerfile and Terraform blocks parse or are recognized excerpts; shell prompt style is consistent; output blocks pair with a command and are never marked runnable; metadata paths match disk.
 
-**Network** (`tests/network/`) — container image references resolve against the registry; images needing auth appear only in allowlisted courses; URLs that commands fetch are live; digest pins are checked for age.
+**Network** (`tests/network/`) — container image references resolve against the registry; images needing auth appear only in allowlisted courses; URLs that commands fetch are live; prose links resolve, with their anchors; digest pins are checked for age.
+
+The link tier fails only on findings that need a person: a dead link or a missing anchor. A permanently moved link is real but mechanically repairable, so it is reported and left to `npm run fix:links` rather than failing a suite nobody can make green by editing content.
 
 Registry lookups retry with backoff before reporting a reference as broken. The registry rate-limits and both network files resolve references at once, so without it a run occasionally failed on connection trouble rather than on anything in the content, and a suite that fails at random gets ignored.
 
@@ -210,6 +245,14 @@ Applied on the `chore/code-block-content-fixes` branch of the content repository
 - **Every digest pin in the content is over a year old.** All 21 resolvable pins exceed the one-year threshold; the youngest is 525 days and five are over three years, the oldest built 2023-05-12. The package versions and CVE counts in the surrounding prose describe those builds.
 - **2 unreferenced content files** in `Tailoring-the-Chainguard-Message`, placeholder lessons that no `lessons-meta.json` points at. Wiring them up or deleting them is an editorial decision.
 - **3 output blocks with no command to attach to**, where the producing command is genuinely implicit: output of a build or an agent session driven by the block above.
+
+### Links
+
+Of 646 unique prose links, 219 are on Chainguard-owned domains. Those break down as 92 healthy, 101 permanently moved, 10 dead, 8 needing a decision, 2 pointing at a heading that no longer exists.
+
+- **The documentation site reorganized underneath the courses.** `chainguard-images` became `containers`, `open-source/melange` became `open-source/build-tools/melange`, `chainguard/administration` became `platform/administration`, `chainguard/migration` became `get-started/migration`. Every one still answers, so nothing looked wrong. `npm run fix:links` rewrites all 101 across 51 files, carrying fragments across.
+- **8 course links are genuinely dead**, seven of them lessons under `partner-guide-to-chainguard-pricing`. The path root still serves 200 and the course under it does not, and this site answers a login gate with a 302 rather than a 404, so these are gone rather than gated.
+- **2 links point at headings that no longer exist.** Both survived years of link checking because the page returns 200; only reading the document for the anchor finds them.
 
 ### What running against the real repository changed in the tool
 
@@ -249,6 +292,35 @@ npm run inventory -- --warnings          # cross-reference discrepancies
 
 The inventory is built in memory on each run; nothing is committed.
 
+## Link CLI
+
+```bash
+npm run check:links                      # check every prose link and report
+npm run check:links -- --owned           # only Chainguard-owned domains
+npm run check:links -- --json            # machine-readable
+npm run check:links -- --markdown        # a pull-request body
+npm run fix:links                        # rewrite the permanently moved links
+npm run fix:links -- --dry-run           # show what would change
+```
+
+`fix:links` only ever touches links a check has just confirmed are permanently moved, one-to-one, on a domain listed in `links.ownedDomains`. It edits the href text in place rather than reserializing the HTML, because these files round-trip to Skilljar and a regenerated document produces a diff of incidental markup changes nobody can review.
+
+Both commands exit non-zero only on findings that need a person.
+
+### Replacing chainlink
+
+This supersedes `tools/chainlink` and its workflow in the content repository. The differences that matter:
+
+| | chainlink | errata |
+|---|---|---|
+| a request that times out | recorded as a 404 | reported separately as unreachable |
+| a page that moved | reported as healthy | rewritten, or held for review |
+| a missing `#anchor` | invisible | reported |
+| output | an issue listing URLs | a pull request with the fixes applied |
+| skipping a link | a bare regex in `ignore.json` | a pattern with a required reason |
+
+`links.skip` requires a `why` for every entry, because an unexplained skip is indistinguishable from a broken link somebody gave up on — and unlike a known-issues entry, nothing there expires.
+
 ## Layout
 
 ```
@@ -259,6 +331,7 @@ src/
   known-issues.js   reads and validates the accepted-findings file
   mirror.js         source adapter: courses, lessons, public URLs
   extract.js        parse5 locate + raw slice, anomaly detection
+  prose-links.js    <a href> extraction, with the href taken from source
   classify.js       kind mapping, shell splitting, image and URL detection
   pairing.js        links output blocks to the command that produced them
   warnings.js       offline rules comparing a command against its own output
@@ -269,7 +342,8 @@ src/
   integrity.js      metadata-vs-disk path checks
   inventory.js      assembles the block records
   registry.js       anonymous registry manifest resolution
-  links.js          URL liveness with HEAD-then-GET fallback
+  links.js          URL liveness, redirect capture, anchor validation
+  link-health.js    which redirects are safe to apply, and the link findings
 tests/helpers.js    assertions that print a full report on failure
 tests/offline/      fast tier, runs on every commit
 tests/network/      slower tier, needs network
