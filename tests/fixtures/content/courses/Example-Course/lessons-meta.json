@@ -1,0 +1,30 @@
+[
+  {
+    "id": "fixturelesson10",
+    "slug": "10-Install-The-Tool",
+    "title": "Install the tool",
+    "order": 10,
+    "description_html": "",
+    "content_items": [
+      {
+        "id": "fixtureitem10a",
+        "file": "lessons/10-Install-The-Tool/content-fixtureitem10a.html",
+        "order": 1
+      }
+    ]
+  },
+  {
+    "id": "fixturelesson20",
+    "slug": "20-Write-A-Config-File",
+    "title": "Write a config file",
+    "order": 20,
+    "description_html": "",
+    "content_items": [
+      {
+        "id": "fixtureitem20a",
+        "file": "lessons/20-Write-A-Config-File/content-fixtureitem20a.html",
+        "order": 1
+      }
+    ]
+  }
+]

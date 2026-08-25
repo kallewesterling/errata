@@ -1,0 +1,20 @@
+<h2>Write a config file</h2>
+<p class="lead">This lesson is fixture content, like the one before it. It carries a configuration block so that the parser checks have something to parse.</p>
+<p>A block whose language maps to a config parser has to parse. A reader who copies a broken sample gets the same error you would, and a sample that never parsed was never run, so the surrounding prose is unlikely to describe what really happens.</p>
+<p>Save the following as <code>example-tool.yaml</code> in the root of your project.</p>
+<pre data-lang="yaml"><code>version: 1
+plugins:
+  - name: linter
+    strict: true
+  - name: formatter
+    width: 88</code></pre>
+<p>The same idea applies to JSON. The checks pick the parser from the language, not from the file name, because a lesson often shows a fragment without naming a file at all.</p>
+<pre data-lang="json"><code>{
+  "version": 1,
+  "plugins": ["linter", "formatter"]
+}</code></pre>
+<p>Ask the tool to read the file back. Escape the angle brackets of any redirection you show, because a <code>pre</code> element is not a raw-text element and a browser parses an unescaped tag as real markup.</p>
+<pre data-lang="console"><code>$ example-tool config show &gt; config-dump.txt
+$ example-tool config validate</code></pre>
+<pre data-lang="ansi"><code>config is valid
+2 plugins loaded</code></pre>
