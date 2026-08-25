@@ -235,6 +235,22 @@ The link tier fails only for a finding that a person must repair: a dead link, o
 
 Registry lookups retry after a delay before errata reports an image as broken. The registry limits the request rate, and both network test files resolve images at the same time. Without the retry, a run sometimes failed because of the connection and not because of the content. People ignore a suite that fails at random.
 
+### The suite needs content, so CI carries a fixture
+
+Errata holds no settings of its own, so its own suite must be pointed at a content repository. On your machine, that is a real checkout under `_local-mirror/`. That directory is git-ignored, and the courses are private, so CI has neither.
+
+`tests/fixtures/content/` is a synthetic content repository that stands in for one. It holds a config, an empty accepted-findings file, and one course with two lessons. The whole offline tier passes against it, so every check runs on every pull request, including the checks that walk a content tree.
+
+To use it yourself:
+
+```bash
+ERRATA_CONFIG=tests/fixtures/content/errata.yaml npm run test:offline
+```
+
+The fixture proves that the checks work. It says nothing about the real content. Run the suite against a real checkout for that.
+
+Keep the fixture clean. A finding in it fails the suite, the same as a finding in real content.
+
 ## Use errata with Syncjar
 
 Syncjar moves content between Skilljar and git. Errata reads the content that arrives in git. Errata never connects to Skilljar.
@@ -351,6 +367,8 @@ scripts/            The three command-line tools.
 tests/helpers.js    Assertions that print a full report when they fail.
 tests/offline/      Fast tier. Run it on every commit.
 tests/network/      Slower tier. Needs the network.
+tests/fixtures/     A synthetic content repository, for CI and for a quick run.
+.github/workflows/  The offline tier, on every pull request.
 ```
 
 ## Next steps

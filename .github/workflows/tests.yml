@@ -1,0 +1,53 @@
+# Runs the offline checks on every pull request.
+#
+# errata carries no configuration of its own, so its suite has to be pointed at
+# a content repository. Developers point it at a clone of the real courses under
+# `_local-mirror/`, which is git-ignored and therefore absent here. That
+# repository is also private and in another organisation, so checking it out
+# would need a cross-organisation token.
+#
+# Instead this job points the suite at the synthetic content repository in
+# `tests/fixtures/content/`. It is a handful of files, and it is enough: the
+# whole offline suite passes against it, including the checks that walk a
+# content tree. What CI cannot tell you is whether the real content is clean.
+# Run `npm test` against a real checkout for that.
+#
+# The network tier is deliberately absent. It resolves container images and
+# fetches links from real registries and websites, so it fails for reasons that
+# have nothing to do with the change under review.
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: Offline tests
+    runs-on: ubuntu-latest
+
+    env:
+      # Selects the fixture content repository. vitest.config.js passes this
+      # through, and src/config.js prefers it over anything it would discover.
+      ERRATA_CONFIG: tests/fixtures/content/errata.yaml
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Node 24 is the current LTS line. package.json asks for >=20.
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run test:offline
+
+      # The types are part of what reviewers read, so a break in them should
+      # not wait for somebody to run tsc by hand.
+      - run: npm run typecheck

@@ -1,0 +1,7 @@
+# Findings in the fixture content that are known and deliberately not fixed.
+#
+# The fixture is written to come out clean, so this list is empty. It exists
+# because a real content repository has one, and errata should read it here for
+# the same reason it reads one there.
+issues: []
+notes: []
