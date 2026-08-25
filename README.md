@@ -318,6 +318,73 @@ Two conventions for showing output coexist: a separate `ansi` block (120 blocks)
 ERRATA_ROOT=/path/to/courses npm test
 ```
 
+## Working with Syncjar
+
+[Syncjar](https://github.com/kallewesterling/syncjar) moves content between Skilljar and git. Errata reads what lands in git and never talks to Skilljar at all. The division is clean everywhere except link checking, where Syncjar has a script errata supersedes — see below.
+
+The two meet at one place: a directory of courses, which Syncjar names `COURSE_CONTENT_PATH` and errata names `ERRATA_ROOT`.
+
+Point both at the same directory and the loop is pull, check, fix, check, push.
+
+```bash
+# 1. Bring Skilljar into git.
+cd ~/syncjar
+COURSE_CONTENT_PATH=~/courses npm run pull
+
+# 2. Check what arrived. Nothing here needs the network except the last two.
+cd ~/errata
+export ERRATA_ROOT=~/courses/courses
+npm run test:offline          # structure, parsing, pairing, metadata
+npm run check:copies          # lessons that are copies, and have drifted
+npm run check:links           # every link and image, against the live web
+
+# 3. Fix. Some of it is mechanical.
+npm run fix:links -- --dry-run
+npm run fix:links
+
+# 4. Confirm, then send it back.
+npm run test:offline
+cd ~/syncjar
+COURSE_CONTENT_PATH=~/courses npm run push -- --dry-run
+COURSE_CONTENT_PATH=~/courses npm run push
+```
+
+`ERRATA_ROOT` points one level deeper than `COURSE_CONTENT_PATH`, at the `courses/` directory inside the content repository rather than the repository root. That is the layout of this particular content repository rather than anything either tool requires; `contentRoot` in `errata.yaml` records it.
+
+### This supersedes Syncjar's `check:links`
+
+Syncjar has a script of the same name. It is not checking a different population: `public/courses/` is a copy of the same lessons, written by `npm run generate:courses` from the same `lessons-meta.json`. It is the same links, read from a gitignored duplicate that only exists after a preview build.
+
+It cannot see the findings that matter most here. It follows redirects without recording them, so the 101 permanently moved links in this content all answer 200 and look healthy. It never fetches a page body, so a `#anchor` pointing at a heading that no longer exists is invisible. It sends only HEAD, so a host that refuses HEAD is reported as broken. Every exception collapses into `status: 'ERROR'`, which makes a timeout indistinguishable from a domain that no longer resolves.
+
+It also passes `timeout: 5000` to `node-fetch`, which was a v2 option; the dependency is `^3.3.2`, where that key is ignored and an unresponsive host has no deadline at all. The report it writes, `public/data/link-report.json`, is gitignored, and nothing in the repository reads it.
+
+Run errata's instead. If the preview UI ever wants a report, `npm run check:links -- --json` produces one.
+
+### Check before you push, not after
+
+Skilljar is the published site, so anything wrong that reaches it is wrong in front of learners until the next round trip. Everything errata does works on local files, which makes the check cheap to run between `pull` and `push`.
+
+This also matters for `fix:links`. It edits the `href` text in place instead of reserializing the HTML, specifically so that `npm run push -- --dry-run` shows you 159 changed URLs rather than 51 files of reformatted markup. A rewriter that regenerated the document would produce a diff nobody could read, and Syncjar shows you that diff before it uploads anything.
+
+### Notes survive the round trip, HTML comments may not
+
+Content goes through Skilljar's editor, which can rewrite markup, so an HTML comment left in a lesson is not guaranteed to come back. `.errata.yaml` lives at the content root instead. Syncjar never uploads it, and it is outside the `[A-Z]*/lessons/` glob the documentation export walks, so it survives both directions. Record accepted findings and standing notes there rather than in the lessons.
+
+### Editing a shared lesson
+
+Courses here reuse lessons, so a change often belongs in more than one place. Before editing, ask what else carries the same text:
+
+```bash
+npm run check:copies -- --map
+```
+
+After editing, run `npm run check:copies` to see whether the copies you did not touch have now drifted from the one you did.
+
+### In CI
+
+The daily sync job opens a pull request titled "Sync Skilljar content" on `chore/sync-skilljar`. That pull request is the natural place to run errata, because it is the moment content enters git and the last moment before anyone builds on it. The link check runs on its own weekly schedule instead, since links rot on the web's timetable rather than on an author's.
+
 ## Inventory CLI
 
 ```bash
@@ -363,9 +430,9 @@ npm run check:copies -- --json           # machine-readable
 
 Always exits zero. Drift here is a question for an author, and the map is not a finding at all.
 
-### What this replaces in the content repository
+### What this replaces
 
-Two tools, both of which check whether a URL answers.
+Three scripts, all of which check whether a URL answers. Two live in the content repository; the third is Syncjar's `check:links`, covered under [Working with Syncjar](#this-supersedes-syncjars-checklinks).
 
 `tools/check-course-image-urls` HEAD-requests every asset in the image manifest and exits non-zero if any fail. Errata covers it by checking the images the lessons actually reference, and separates a timed-out request from a genuinely missing asset, which that tool reports identically.
 
