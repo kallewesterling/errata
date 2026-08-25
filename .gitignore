@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+*.log
+
+# Local content mirror, pending the Syncjar integration.
+_local-mirror/

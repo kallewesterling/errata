@@ -1,0 +1,36 @@
+{
+  "name": "@kallewesterling/errata",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Finds errors in the code examples inside published course content, and keeps a dated record of the ones not yet fixed.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kallewesterling/errata.git"
+  },
+  "scripts": {
+    "test": "vitest run --project offline",
+    "test:offline": "vitest run --project offline",
+    "test:network": "vitest run --project network",
+    "test:all": "vitest run",
+    "inventory": "node scripts/inventory.js",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
+  },
+  "dependencies": {
+    "dockerfile-ast": "^0.7.0",
+    "entities": "^6.0.0",
+    "parse5": "^7.2.1",
+    "yaml": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
