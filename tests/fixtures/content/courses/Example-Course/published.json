@@ -1,0 +1,10 @@
+{
+  "course_id": "fixturecourse01",
+  "domains": {
+    "courses.example.com": {
+      "slug": "example-course",
+      "published_course_id": "fixturepublished1",
+      "hidden": false
+    }
+  }
+}

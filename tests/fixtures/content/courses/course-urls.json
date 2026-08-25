@@ -1,0 +1,6 @@
+{
+  "description": "Course directory -> public URL. A real content repository generates this index; the fixture writes it by hand so that lesson URLs appear in reports.",
+  "urls": {
+    "Example-Course": "https://courses.example.com/example-course"
+  }
+}
