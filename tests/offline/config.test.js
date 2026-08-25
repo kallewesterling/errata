@@ -39,11 +39,63 @@ function loadConfig(yaml) {
   }
 }
 
+/**
+ * Import src/config.js in a child process and report what it resolved.
+ *
+ * The suite itself runs with ERRATA_CONFIG set, so both variables are cleared
+ * before the child's own environment is applied. Otherwise every discovery test
+ * would be answered by the setting vitest passes down.
+ *
+ * @param {{env?: Record<string, string>, cwd?: string}} options
+ */
+function probeConfig({ env = {}, cwd = repoRoot } = {}) {
+  const base = { ...process.env };
+  delete base.ERRATA_CONFIG;
+  delete base.ERRATA_ROOT;
+
+  try {
+    const out = execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `import(${JSON.stringify(path.join(repoRoot, "src/config.js"))}).then((c) =>
+           console.log(JSON.stringify({ config: c.configFile, contentRoot: c.contentRoot })))`,
+      ],
+      { cwd, env: { ...base, ...env }, stdio: "pipe" },
+    );
+    return { ok: true, ...JSON.parse(String(out)) };
+  } catch (err) {
+    return { ok: false, stderr: String(err.stderr) };
+  }
+}
+
+/**
+ * Compare two paths after resolving symlinks.
+ *
+ * The temporary directory is reached through /var on macOS, which is a symlink
+ * to /private/var. `path.resolve` does not follow it, so the two sides can name
+ * the same directory and still differ as strings.
+ */
+const samePath = (a, b) => expect(fs.realpathSync(a)).toBe(fs.realpathSync(b));
+
+/** A content repository with a config at its root. */
+function makeContentRepo(configYaml) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "errata-repo-"));
+  fs.mkdirSync(path.join(root, "courses"));
+  fs.writeFileSync(path.join(root, "errata.yaml"), configYaml);
+  written.push(path.join(root, "errata.yaml"));
+  return root;
+}
+
 afterEach(() => {
   for (const file of written.splice(0)) fs.rmSync(path.dirname(file), { recursive: true });
 });
 
 const VALID = fs.readFileSync(configFile, "utf8");
+
+/** The checked-in config, repointed at a `courses` directory beside it. */
+const PORTABLE = VALID.replace(/^contentRoot: .*$/m, "contentRoot: courses");
 
 describe("configuration file", () => {
   it("loads the checked-in config", () => {
@@ -81,6 +133,61 @@ describe("configuration file", () => {
 });
 
 /**
+ * The settings describe a body of content, so the file lives with the content.
+ * errata carries none of its own, which is what makes it reusable.
+ */
+describe("finding the configuration file", () => {
+  it("resolves a relative contentRoot against the config file, not against errata", () => {
+    const root = makeContentRepo(PORTABLE);
+    const result = probeConfig({ env: { ERRATA_CONFIG: path.join(root, "errata.yaml") } });
+
+    expect(result.ok, result.stderr).toBe(true);
+    samePath(result.contentRoot, path.join(root, "courses"));
+  });
+
+  it("finds the config in the parent of ERRATA_ROOT", () => {
+    const root = makeContentRepo(PORTABLE);
+    const result = probeConfig({ env: { ERRATA_ROOT: path.join(root, "courses") } });
+
+    expect(result.ok, result.stderr).toBe(true);
+    samePath(result.config, path.join(root, "errata.yaml"));
+  });
+
+  it("finds the config by walking up from the working directory", () => {
+    const root = makeContentRepo(PORTABLE);
+    const result = probeConfig({ cwd: path.join(root, "courses") });
+
+    expect(result.ok, result.stderr).toBe(true);
+    samePath(result.config, path.join(root, "errata.yaml"));
+  });
+
+  it("prefers ERRATA_CONFIG over anything it would otherwise discover", () => {
+    const chosen = makeContentRepo(PORTABLE);
+    const ignored = makeContentRepo(PORTABLE);
+    const result = probeConfig({
+      env: {
+        ERRATA_CONFIG: path.join(chosen, "errata.yaml"),
+        ERRATA_ROOT: path.join(ignored, "courses"),
+      },
+    });
+
+    expect(result.ok, result.stderr).toBe(true);
+    samePath(result.config, path.join(chosen, "errata.yaml"));
+  });
+
+  it("names the paths it tried when there is no config anywhere", () => {
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), "errata-empty-"));
+    const result = probeConfig({ cwd: empty, env: { ERRATA_ROOT: empty } });
+
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("No errata.yaml found");
+    expect(result.stderr).toContain("errata.example.yaml");
+    expect(result.stderr).toContain(empty);
+    fs.rmSync(empty, { recursive: true });
+  });
+});
+
+/**
  * Thresholds and allowlists are edited by hand, so a mistyped key has to be an
  * error. A setting that quietly defaulted would let the suite pass while
  * checking nothing.
@@ -102,6 +209,20 @@ describe("configuration validation", () => {
     const result = loadConfig(VALID.replace(/staleImageRefs: \d+/, "staleImageRefs: -1"));
     expect(result.ok).toBe(false);
     expect(result.stderr).toContain("non-negative integer");
+  });
+
+  it("accepts a config that omits nonImageNamespaces", () => {
+    const withoutIt = VALID.replace(/^nonImageNamespaces:\n(?:  - .*\n)+/m, "");
+    expect(withoutIt).not.toContain("nonImageNamespaces");
+    expect(loadConfig(withoutIt).ok).toBe(true);
+  });
+
+  it("rejects nonImageNamespaces that is not a list of strings", () => {
+    const result = loadConfig(
+      VALID.replace(/^nonImageNamespaces:\n(?:  - .*\n)+/m, "nonImageNamespaces: java\n"),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.stderr).toContain("nonImageNamespaces must be a list");
   });
 
   it("rejects an unknown language kind", () => {

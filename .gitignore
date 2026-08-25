@@ -4,3 +4,8 @@ node_modules/
 
 # Local content mirror, pending the Syncjar integration.
 _local-mirror/
+
+# Project config belongs with the content, not with the tool.
+# Copy errata.example.yaml to your content repository. A local one here is
+# only for development against a checkout in _local-mirror/.
+errata.yaml
