@@ -13,8 +13,9 @@
  *
  * The file lives with the content rather than here, because that is what it
  * describes. It is a dotfile at the content repository root, which keeps it
- * clear of both directions of sync: Syncjar never sends it to Skilljar, and
- * the GCS export walks `[A-Z]*` so it is not picked up there either.
+ * clear of any sync that walks the content directories themselves. Anything
+ * recorded inside a lesson instead has to survive a round trip through the
+ * publishing system's editor, which may rewrite the markup.
  */
 import fs from "node:fs";
 import { parse as parseYaml } from "yaml";

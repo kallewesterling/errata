@@ -8,14 +8,59 @@ export const repoRoot = path.resolve(
   "..",
 );
 
-const configPath =
-  process.env.ERRATA_CONFIG ?? path.join(repoRoot, "errata.yaml");
+const CONFIG_NAME = "errata.yaml";
+
+/**
+ * Locate the config file.
+ *
+ * The settings describe a body of content, not this tool, so the file belongs
+ * with the content. errata itself ships only `errata.example.yaml`; a checkout
+ * of errata on its own has nothing to check and no opinion about what correct
+ * means, so there is no default to fall back to.
+ *
+ * Search order, first hit wins:
+ *
+ *   1. ERRATA_CONFIG, when set.
+ *   2. Beside ERRATA_ROOT, then in its parent. Pointing at content is enough
+ *      to find the settings that go with it.
+ *   3. Walking up from the working directory, which finds it when you run
+ *      errata from inside the content repository.
+ *
+ * @returns {string}
+ */
+function discoverConfig() {
+  if (process.env.ERRATA_CONFIG) return path.resolve(process.env.ERRATA_CONFIG);
+
+  const tried = [];
+  if (process.env.ERRATA_ROOT) {
+    const root = path.resolve(process.env.ERRATA_ROOT);
+    tried.push(path.join(root, CONFIG_NAME));
+    tried.push(path.join(path.dirname(root), CONFIG_NAME));
+  }
+  for (let dir = process.cwd(); ; dir = path.dirname(dir)) {
+    tried.push(path.join(dir, CONFIG_NAME));
+    if (path.dirname(dir) === dir) break;
+  }
+
+  const found = tried.find((file) => fs.existsSync(file));
+  if (found) return found;
+
+  throw new Error(
+    `No ${CONFIG_NAME} found. It belongs with the content it describes, not ` +
+      `with errata.\n\nCopy ${path.join(repoRoot, "errata.example.yaml")} to ` +
+      `the root of your content repository and edit it, or set ERRATA_CONFIG ` +
+      `to an existing file.\n\nLooked in:\n${tried.map((f) => `  ${f}`).join("\n")}`,
+  );
+}
+
+const configPath = discoverConfig();
 
 const TOP_LEVEL_KEYS = new Set([
   "contentRoot",
   "knownIssuesFile",
   "primaryDomain",
   "registryPrefixes",
+  "nonImageNamespaces",
   "staleImageDays",
   "languages",
   "privateImages",
@@ -24,6 +69,9 @@ const TOP_LEVEL_KEYS = new Set([
   "driftBudget",
   "duplication",
 ]);
+
+/** Settings that may be omitted, with the value used when they are. */
+const OPTIONAL_KEYS = new Map([["nonImageNamespaces", []]]);
 
 const KINDS = new Set(["shell", "output", "config", "source"]);
 const PARSERS = new Set(["json", "yaml", "dockerfile", "hcl"]);
@@ -50,7 +98,12 @@ function validate(raw) {
     }
   }
   for (const key of TOP_LEVEL_KEYS) {
-    if (raw[key] === undefined) fail(`missing required setting "${key}"`);
+    if (raw[key] !== undefined) continue;
+    if (OPTIONAL_KEYS.has(key)) {
+      raw[key] = structuredClone(OPTIONAL_KEYS.get(key));
+      continue;
+    }
+    fail(`missing required setting "${key}"`);
   }
 
   if (typeof raw.contentRoot !== "string") fail("contentRoot must be a string");
@@ -58,6 +111,12 @@ function validate(raw) {
   if (typeof raw.primaryDomain !== "string") fail("primaryDomain must be a string");
   if (!Array.isArray(raw.registryPrefixes) || raw.registryPrefixes.length === 0) {
     fail("registryPrefixes must be a non-empty list");
+  }
+  if (
+    !Array.isArray(raw.nonImageNamespaces) ||
+    raw.nonImageNamespaces.some((n) => typeof n !== "string")
+  ) {
+    fail("nonImageNamespaces must be a list of path segments");
   }
   if (!Number.isFinite(raw.staleImageDays) || raw.staleImageDays <= 0) {
     fail("staleImageDays must be a positive number of days");
@@ -156,10 +215,13 @@ const config = load();
 /**
  * Root of the content source. `ERRATA_ROOT` wins over the config file so a
  * different tree can be checked without editing anything.
+ *
+ * A relative `contentRoot` is resolved against the config file, not against
+ * errata, because the two now live in different repositories.
  */
 export const contentRoot = process.env.ERRATA_ROOT
   ? path.resolve(process.env.ERRATA_ROOT)
-  : path.resolve(repoRoot, config.contentRoot);
+  : path.resolve(path.dirname(configPath), config.contentRoot);
 
 /** Domain whose published slugs are used to build public lesson URLs. */
 export const primaryDomain = config.primaryDomain;
@@ -171,6 +233,18 @@ export const knownLangs = Object.freeze(Object.keys(langTaxonomy));
 
 /** Registry namespaces whose image references are worth resolving. */
 export const registryPrefixes = config.registryPrefixes;
+
+/**
+ * Path segments under a registry host that are not container repositories.
+ *
+ * A registry often serves more than images from the same hostname, and a bare
+ * host-prefix match picks those up as if they were repositories. Resolving one
+ * returns a misleading 401. The OCI paths `v2` and `token` are excluded
+ * always; this setting names whatever else a given registry hosts.
+ */
+export const nonImageNamespaces = Object.freeze([
+  ...config.nonImageNamespaces,
+]);
 
 /** Age at which a pinned digest is treated as misleading rather than behind. */
 export const staleImageDays = config.staleImageDays;
@@ -198,7 +272,7 @@ export const linkSkips = Object.freeze(
 /**
  * True when a URL sits on a domain we control, including any subdomain.
  *
- * Compared on labels rather than with a suffix test, so `notchainguard.dev`
+ * Compared on labels rather than with a suffix test, so `notexample.com`
  * cannot pass by ending in the same characters.
  *
  * @param {string} url

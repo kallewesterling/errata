@@ -57,7 +57,7 @@ const problems = collectLinkProblems(verdicts, links).filter((p) => p.items.leng
  * Rewrite the confirmed-safe redirects in place.
  *
  * Replacement is done on the exact href text rather than by regenerating the
- * HTML, because these files are round-tripped to Skilljar and reserializing
+ * HTML, because these files round-trip to a publishing system and reserializing
  * them would produce a diff full of incidental markup changes that reviewers
  * cannot read past.
  */

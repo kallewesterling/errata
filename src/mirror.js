@@ -1,3 +1,11 @@
+/**
+ * Source adapter.
+ *
+ * This is the only module that knows the directory layout of the content: the
+ * per-course `details.json`, `published.json` and `lessons-meta.json`, and the
+ * `course-urls.json` index at the root. That shape is what Syncjar writes.
+ * Reading from a different source should be a change to this file alone.
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { contentRoot, primaryDomain } from "./config.js";
@@ -86,8 +94,8 @@ export function loadCourses() {
 }
 
 /**
- * Public URL for a lesson. Skilljar lesson slugs carry a numeric ordering
- * prefix in the mirror (`60-Hands-on-...`) that is not part of the web URL.
+ * Public URL for a lesson. Lesson directories carry a numeric ordering prefix
+ * (`60-Hands-on-...`) that is not part of the published URL.
  * @param {Course} course
  * @param {Lesson} lesson
  * @returns {string|null}

@@ -40,9 +40,9 @@ function segments(url) {
  * True when `url` is an ancestor of some other page we have seen.
  *
  * This is how a section index is told apart from a page, without hardcoding
- * any knowledge of the site. `/chainguard/containers/` is an ancestor of
- * `/chainguard/containers/faq/`, so it is a landing page; `/chainguard/
- * containers/faq/` is an ancestor of nothing, so it is a real page.
+ * any knowledge of the site. `/docs/containers/` is an ancestor of
+ * `/docs/containers/faq/`, so it is a landing page; `/docs/containers/faq/`
+ * is an ancestor of nothing, so it is a real page.
  *
  * @param {string} url
  * @param {string[][]} allPaths

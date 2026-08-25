@@ -1,0 +1,164 @@
+# Configuration for errata.
+#
+# Copy this file to the root of your content repository, name it `errata.yaml`,
+# and edit the values. The settings describe your content, so they belong with
+# the content and not with errata.
+#
+# errata finds this file in three ways, and takes the first one that exists:
+#
+#   1. The path in ERRATA_CONFIG.
+#   2. `errata.yaml` beside ERRATA_ROOT, or in its parent directory.
+#   3. `errata.yaml` in the working directory, or any directory above it.
+#
+# Unknown top-level keys are rejected, so a typo fails loudly instead of taking
+# a default value in silence.
+
+# Where the course directories live, relative to this file.
+# Override at runtime with ERRATA_ROOT.
+contentRoot: courses
+
+# Findings that are known, understood, and deliberately not fixed yet.
+#
+# Resolved relative to contentRoot, not to this file, so that pointing
+# ERRATA_ROOT at a different checkout picks up that checkout's own record.
+#
+# Keep it a dotfile at the repository root. That puts it outside the directories
+# a content sync walks, so it survives a round trip to the publishing system.
+knownIssuesFile: ../.errata.yaml
+
+# Domain whose published slugs build the public lesson URLs.
+primaryDomain: courses.example.com
+
+# Registry host prefixes whose image references are worth resolving.
+# Leave the trailing slash on each one.
+registryPrefixes:
+  - registry.example.com/
+
+# Path segments under a registry host that are not container repositories.
+#
+# A registry often serves other things from the same hostname, and errata would
+# otherwise try to resolve them as images and report a misleading 401. The OCI
+# paths `v2` and `token` are always excluded, so do not list them here.
+#
+# Optional. Omit it if your registry serves images and nothing else.
+nonImageNamespaces: []
+
+# Age at which a digest pinned in the content stops being merely behind its tag
+# and starts being misleading.
+#
+# Images that rebuild often are behind their tag within days, and that alone
+# says nothing. Choose the age at which the surrounding prose -- package
+# versions, vulnerability counts, sample output -- stops matching what a reader
+# would see today.
+staleImageDays: 365
+
+# `data-lang` value -> how the block should be treated by the tests.
+#
+# `kind` is the axis the tests dispatch on, and it deliberately does not match
+# `data-lang` one to one. Two languages can both be terminal text while only one
+# of them is something a reader is meant to run.
+#
+#   shell   executable commands
+#   output  transcripts and sample output; never executable
+#   config  declarative files that should parse with a real parser
+#   source  program source in some other language
+#
+# `parser` selects the checker in src/parse-config.js: json, yaml, dockerfile,
+# or hcl.
+#
+# Every `data-lang` in your content must appear here. An unlisted one is a
+# finding, because it is usually a typo.
+languages:
+  console: { kind: shell }
+  bash: { kind: shell }
+  ansi: { kind: output }
+  text: { kind: output }
+  json: { kind: config, parser: json }
+  yaml: { kind: config, parser: yaml }
+  dockerfile: { kind: config, parser: dockerfile }
+  terraform: { kind: config, parser: hcl }
+  go: { kind: source }
+  python: { kind: source }
+  markdown: { kind: source }
+
+# Courses permitted to reference container images that need a login.
+#
+# Most courses should use only images that a reader can pull anonymously. A
+# private image in a course that is not listed here usually means somebody
+# copied a sample from internal material, and the reader gets a 401.
+#
+# errata checks this list in both directions. A course listed here that uses no
+# private image also fails, so an entry cannot outlive its reason.
+privateImages:
+  allowedCourses: []
+
+# Structural problems in the source HTML worth reporting.
+#
+# There is no count here. Any instance is a finding. One that you understand and
+# have not fixed belongs in the known-issues file, where it is named and dated.
+anomalies:
+  # A <pre> with no data-lang attribute.
+  - missing-lang
+  # A <pre> with no <code> child.
+  - missing-code-element
+  # Unescaped markup inside a block, which the reader's browser parses as real
+  # markup and then drops.
+  - unescaped-markup
+
+# Checking of the links in the lesson prose.
+links:
+  # Domains you control, matched on the registrable domain so that every
+  # subdomain qualifies.
+  #
+  # This is not the same idea as primaryDomain, which names the one site whose
+  # slugs build the lesson URLs. This list answers a different question: whose
+  # redirects do you trust enough to rewrite your content against? A 301 from a
+  # site you run is a decision by somebody you can ask. A 301 from a third party
+  # can be a URL shortener, an A/B test, or a consent wall.
+  ownedDomains:
+    - example.com
+
+  # Links that no check can reach, each with the reason.
+  #
+  # Every entry needs a `why`. A skip with no reason looks the same as a broken
+  # link that somebody gave up on, and nothing in this file expires.
+  skip:
+    - pattern: '^https?://(www\.)?(twitter|x)\.com/'
+      why: Serves a login wall to anything without a browser session.
+    - pattern: '^https?://localhost'
+      why: Only resolvable on the reader's own machine.
+
+# Ceilings for measurements that move without anybody touching the content.
+#
+# These are the one case a known-issues entry cannot express. An entry pins the
+# content it was accepted against and expires when that content changes. That is
+# right for a discrete bug, and useless for a digest that ages by a day every
+# day while the block itself never changes.
+driftBudget:
+  # Digest-pinned references older than staleImageDays.
+  staleImageRefs: 0
+
+# Lessons that are copies of each other.
+#
+# Reuse is often deliberate, so repetition is not the finding. Two copies that
+# have drifted apart is, because it usually means an edit reached one of them
+# and not the other.
+duplication:
+  # Ignore anything shorter than this many words. Short items are mostly a
+  # heading and a sentence, and they match each other on almost no evidence.
+  minWords: 50
+
+  # Word n-gram length. Five is the usual choice for prose: long enough that a
+  # match is not a coincidence, short enough to survive a small edit.
+  shingleSize: 5
+
+  # Report a pair at or above this Jaccard score. Lower it and you start to
+  # admit lessons that merely share a subject.
+  threshold: 0.80
+
+  # Elements whose text is not prose that a reader compares. A widget that lists
+  # sibling courses is supposed to differ between copies, and left in it can
+  # dominate every comparison it takes part in.
+  ignoreElements:
+    - script
+    - style

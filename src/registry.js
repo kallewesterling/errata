@@ -8,7 +8,7 @@ const MANIFEST_ACCEPT = [
 /**
  * Split an image reference into registry, repository and the tag or digest.
  * Returns null for references that are not a resolvable image, such as the
- * `cgr.dev/token` auth endpoint that appears in curl examples.
+ * `<registry>/token` auth endpoint that appears in curl examples.
  *
  * @param {string} ref
  */
@@ -17,7 +17,7 @@ export function parseImageRef(ref) {
   if (!match) return null;
 
   const [, registry, repository, tag, digest] = match;
-  if (!repository.includes("/")) return null; // e.g. cgr.dev/token
+  if (!repository.includes("/")) return null; // e.g. <registry>/token
 
   return { registry, repository, reference: digest ?? tag ?? "latest", ref };
 }

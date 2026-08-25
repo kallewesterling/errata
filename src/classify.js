@@ -1,12 +1,19 @@
-import { langTaxonomy, registryPrefixes } from "./config.js";
+import {
+  langTaxonomy,
+  nonImageNamespaces,
+  registryPrefixes,
+} from "./config.js";
 import { checkConfig, hasElision } from "./parse-config.js";
+
+/** @param {string} s */
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Placeholders a reader is expected to substitute before running a command. */
 const PLACEHOLDER_PATTERNS = [
   /\{[a-z][a-z0-9_.-]*\}/i, // {your_github_name}
   /<[a-z][a-z0-9_ .-]*>/i, // <package search term>
   /\bYOUR_[A-Z_]+\b/, // YOUR_TOKEN
-  /\$\{\{[^}]+\}\}/, // ${{package.version}} (melange/GitHub Actions)
+  /\$\{\{[^}]+\}\}/, // ${{package.version}}, as used by GitHub Actions and others
 ];
 
 /**
@@ -138,11 +145,15 @@ export function splitShell(code) {
 }
 
 /**
- * Namespaces under a registry host that are not container repositories:
- * the registry HTTP API, and the Chainguard Libraries endpoints that serve
- * Java, JavaScript and Python artifacts.
+ * Namespaces under a registry host that are not container repositories.
+ *
+ * `v2` and `token` are the OCI distribution API and its auth endpoint, so they
+ * are excluded for every registry. Anything else a particular registry serves
+ * from the same host is named in `nonImageNamespaces`.
  */
-const NON_IMAGE_NAMESPACES = /^(?:v2|token|java|javascript|python)(?:\/|$)/;
+const NON_IMAGE_NAMESPACES = new RegExp(
+  `^(?:v2|token${nonImageNamespaces.map((n) => `|${escapeRe(n)}`).join("")})(?:/|$)`,
+);
 
 /** Organization stand-ins a reader is meant to replace with their own. */
 const PLACEHOLDER_ORGS =
@@ -151,10 +162,10 @@ const PLACEHOLDER_ORGS =
 /**
  * Container image references worth resolving against a registry.
  *
- * The registry host also serves its own HTTP API and the Chainguard Libraries
- * artifact endpoints, so a bare host-prefix match picks up plenty of strings
- * that are not images. Resolving those produces misleading 401s, so they are
- * filtered out here rather than explained away in the test output.
+ * A registry host usually serves more than images, so a bare host-prefix match
+ * picks up plenty of strings that are not references. Resolving those produces
+ * misleading 401s, so they are filtered out here rather than explained away in
+ * the test output.
  */
 export function findImageRefs(code) {
   const refs = new Set();
