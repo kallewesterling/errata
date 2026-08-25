@@ -16,7 +16,7 @@ npm test              # offline tier, ~1s, no network
 npm run test:network  # network tier: registry and link checks
 npm run test:all      # both
 npm run inventory     # summary of what was found
-npm run check:links   # prose links: dead, moved, and broken anchors
+npm run check:links   # links and images: dead, moved, and broken anchors
 ```
 
 ## Configuration
@@ -115,6 +115,14 @@ The same applies to image references: the registry host also serves its own HTTP
 ### Prose links are a different population from code URLs
 
 An `<a href>` in prose is a promise to the reader that there is something at the other end, so unlike a URL in a code block, every one is worth checking. `src/prose-links.js` extracts them with the same care `src/extract.js` gives code: located with a parser, but with the href recovered from the source text, because the parser decodes entities and a rewriter handed `?a=1&b=2` would silently fail to find `?a=1&amp;b=2` in the file.
+
+### Images are checked against the page, not against a manifest
+
+`<img src>` is extracted in the same pass, because an image is a stronger claim than a link. A reader can decline to follow a link; an image is part of the page, and when its source is gone the lesson renders with a hole where a screenshot of the thing being explained used to be.
+
+The content repository already had `tools/check-course-image-urls`, which checks that every asset in `course-images/image-manifest.json` is reachable on the bucket. That answers a related but different question. The manifest records what a migration uploaded; the HTML records what readers actually load. The two agree today — 226 unique images on both sides, no drift in either direction — but the manifest is a finished build artifact while the HTML keeps being edited through Skilljar, so the first image added in the Skilljar editor is one the manifest cannot know about. Checking the HTML is checking the thing that breaks.
+
+Because a bucket asset does not meaningfully move, images take the same liveness and redirect path as links but are reported as their own finding, named by their alt text, since the bucket names assets by hash and a URL alone is a poor way to identify a missing screenshot.
 
 ### A link can rot in three different ways
 
@@ -216,7 +224,7 @@ Reports are written to stderr and the assertion message is kept to one line. The
 
 **Offline** (`tests/offline/`, no network) — extractor and pairing unit tests; every block has a known `data-lang`; JSON, YAML, Dockerfile and Terraform blocks parse or are recognized excerpts; shell prompt style is consistent; output blocks pair with a command and are never marked runnable; metadata paths match disk.
 
-**Network** (`tests/network/`) — container image references resolve against the registry; images needing auth appear only in allowlisted courses; URLs that commands fetch are live; prose links resolve, with their anchors; digest pins are checked for age.
+**Network** (`tests/network/`) — container image references resolve against the registry; images needing auth appear only in allowlisted courses; URLs that commands fetch are live; prose links resolve, with their anchors; every `<img src>` loads; digest pins are checked for age.
 
 The link tier fails only on findings that need a person: a dead link or a missing anchor. A permanently moved link is real but mechanically repairable, so it is reported and left to `npm run fix:links` rather than failing a suite nobody can make green by editing content.
 
@@ -253,6 +261,10 @@ Of 646 unique prose links, 219 are on Chainguard-owned domains. Those break down
 - **The documentation site reorganized underneath the courses.** `chainguard-images` became `containers`, `open-source/melange` became `open-source/build-tools/melange`, `chainguard/administration` became `platform/administration`, `chainguard/migration` became `get-started/migration`. Every one still answers, so nothing looked wrong. `npm run fix:links` rewrites all 101 across 51 files, carrying fragments across.
 - **8 course links are genuinely dead**, seven of them lessons under `partner-guide-to-chainguard-pricing`. The path root still serves 200 and the course under it does not, and this site answers a login gate with a 302 rather than a 404, so these are gone rather than gated.
 - **2 links point at headings that no longer exist.** Both survived years of link checking because the page returns 200; only reading the document for the anchor finds them.
+
+### Images
+
+All 226 unique images, across 309 occurrences, resolve. Every one is on the GCS bucket, none are relative, and there are no `srcset`, `poster` or inline-CSS `url()` references to worry about. This is the answer worth having on record: the bucket is healthy, and now the check watches what the lessons display rather than what a migration wrote down.
 
 ### What running against the real repository changed in the tool
 
@@ -307,9 +319,13 @@ npm run fix:links -- --dry-run           # show what would change
 
 Both commands exit non-zero only on findings that need a person.
 
-### Replacing chainlink
+### What this replaces in the content repository
 
-This supersedes `tools/chainlink` and its workflow in the content repository. The differences that matter:
+Two tools, both of which check whether a URL answers.
+
+`tools/check-course-image-urls` HEAD-requests every asset in the image manifest and exits non-zero if any fail. Errata covers it by checking the images the lessons actually reference, and separates a timed-out request from a genuinely missing asset, which that tool reports identically.
+
+`tools/chainlink` and its workflow. The differences that matter:
 
 | | chainlink | errata |
 |---|---|---|
@@ -331,7 +347,7 @@ src/
   known-issues.js   reads and validates the accepted-findings file
   mirror.js         source adapter: courses, lessons, public URLs
   extract.js        parse5 locate + raw slice, anomaly detection
-  prose-links.js    <a href> extraction, with the href taken from source
+  prose-links.js    <a href> and <img src>, taken from the source text
   classify.js       kind mapping, shell splitting, image and URL detection
   pairing.js        links output blocks to the command that produced them
   warnings.js       offline rules comparing a command against its own output
