@@ -32,6 +32,20 @@ describe("links in lesson prose", () => {
     expectNone(problem("dead-link").items.length, problem("dead-link"));
   });
 
+  /**
+   * Images are checked in the same pass and asserted the same way. A broken
+   * image is at least as bad as a broken link, and unlike a redirect there is
+   * nothing a fixer could do about it automatically.
+   */
+  it("has no images that fail to load", () => {
+    expectNone(problem("dead-image").items.length, problem("dead-image"));
+  });
+
+  it("checks every image the lessons display", () => {
+    const images = checkableLinks(links).filter((l) => l.kind === "image");
+    expect(images.length).toBeGreaterThan(0);
+  });
+
   it("has none pointing at a heading that no longer exists", () => {
     expectNone(problem("missing-fragment").items.length, problem("missing-fragment"));
   });

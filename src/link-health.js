@@ -17,7 +17,7 @@ import { style } from "./report.js";
  * @property {string} [reason]  Why a redirect needs a human, when it does.
  */
 
-/** Every checkable prose link, with the skipped ones removed. */
+/** Every checkable prose reference, with the skipped ones removed. */
 export function checkableLinks(links) {
   return links.filter((link) => link.scheme === "http" && !skipReason(link.url));
 }
@@ -169,6 +169,19 @@ export function rewriteTarget(result) {
 }
 
 /**
+ * The alt text of the first occurrence of an image, to name it in a report.
+ *
+ * A URL alone is a poor way to identify a broken screenshot, since the bucket
+ * names assets by hash.
+ *
+ * @param {Map<string, import("./inventory.js").ProseLink[]>} sites
+ * @param {string} url
+ */
+function altFor(sites, url) {
+  return (sites.get(url) ?? []).find((link) => link.kind === "image")?.text ?? "";
+}
+
+/**
  * Build the problem list for a set of judged links.
  *
  * @param {LinkVerdict[]} verdicts
@@ -197,6 +210,10 @@ export function collectLinkProblems(verdicts, links) {
     locations: locationsFor(verdict.result.url),
   });
 
+  /** What the page does with a URL. The same URL can be both. */
+  const usedAs = (url, kind) =>
+    (sites.get(url) ?? []).some((link) => link.kind === kind);
+
   const of = (name) => verdicts.filter((v) => v.verdict === name);
 
   return [
@@ -209,9 +226,30 @@ export function collectLinkProblems(verdicts, links) {
       fix:
         "Find where the page moved to and update the href, or remove the " +
         "sentence if the material no longer exists.",
-      items: of("dead").map((v) =>
-        item(v, `${style.link(v.result.url)}  ${style.bad(v.result.detail)}`),
-      ),
+      items: of("dead")
+        .filter((v) => usedAs(v.result.url, "link"))
+        .map((v) => item(v, `${style.link(v.result.url)}  ${style.bad(v.result.detail)}`)),
+      accepted: [],
+    },
+    {
+      id: "dead-image",
+      title: "images that do not load",
+      why:
+        "An image is not a promise a reader can choose not to follow; it is " +
+        "part of the page. When the source is gone the lesson renders with a " +
+        "hole in it, and a screenshot of the thing being explained is usually " +
+        "carrying the explanation.",
+      fix:
+        "Check the asset was uploaded to the bucket under the name the lesson " +
+        "uses. If the image is genuinely gone, replace it rather than dropping " +
+        "the tag, because the surrounding prose refers to it.",
+      items: of("dead")
+        .filter((v) => usedAs(v.result.url, "image"))
+        .map((v) =>
+          item(v, `${style.link(v.result.url)}  ${style.bad(v.result.detail)}`, [
+            ["alt text", altFor(sites, v.result.url) || "(none)"],
+          ]),
+        ),
       accepted: [],
     },
     {

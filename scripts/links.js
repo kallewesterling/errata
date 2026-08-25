@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Check the links in lesson prose, and optionally repair the safe ones.
+ * Check what lesson prose points at — links and images — and optionally repair
+ * the safe ones.
  *
  *   npm run check:links                  check everything and report
  *   npm run check:links -- --owned       only domains we control
@@ -38,8 +39,13 @@ let urls = uniqueUrls(links);
 if (has("--owned")) urls = urls.filter(isOwnedDomain);
 
 if (!has("--json")) {
+  const sites = checkableLinks(links);
+  const images = sites.filter((l) => l.kind === "image").length;
   process.stderr.write(
-    `${style.muted(`Checking ${urls.length} unique URLs from ${checkableLinks(links).length} links...`)}\n`,
+    `${style.muted(
+      `Checking ${urls.length} unique URLs from ${sites.length - images} links ` +
+        `and ${images} images...`,
+    )}\n`,
   );
 }
 
@@ -76,9 +82,11 @@ function applyFixes({ dryRun }) {
     for (const link of inFile) {
       const to = moves.get(link.url);
       // Match the attribute rather than the bare URL so a URL that also appears
-      // in prose text or inside a code block is left alone.
+      // in prose text or inside a code block is left alone. The attribute name
+      // comes from the occurrence, so an image is never edited as if it were a
+      // link, and vice versa.
       const pattern = new RegExp(
-        `(href\\s*=\\s*["'])${link.rawHref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(["'])`,
+        `(${link.attr}\\s*=\\s*["'])${link.rawHref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(["'])`,
         "g",
       );
       const updated = html.replace(pattern, `$1${to}$2`);
@@ -133,13 +141,29 @@ function markdown() {
     );
   }
 
+  const imageUrls = new Set(
+    checkableLinks(links)
+      .filter((l) => l.kind === "image")
+      .map((l) => l.url),
+  );
+  const isImage = (v) => imageUrls.has(v.result.url);
+
   const sections = [
     {
-      list: of("dead"),
+      list: of("dead").filter((v) => !isImage(v)),
       title: "Dead links, needing a person",
       blurb: "These return 404 or 410. Nothing automatic can know where they were meant to point.",
       row: (v) => `| ${v.result.url} | ${v.result.detail} | ${where(v.result.url).join("<br>")} |`,
       head: "| Link | Status | Appears in |",
+    },
+    {
+      list: of("dead").filter(isImage),
+      title: "Images that do not load",
+      blurb:
+        "These are `<img src>` targets, so the lesson renders with a hole in it rather than " +
+        "with a link a reader can decline to follow. Usually the asset never reached the bucket.",
+      row: (v) => `| ${v.result.url} | ${v.result.detail} | ${where(v.result.url).join("<br>")} |`,
+      head: "| Image | Status | Appears in |",
     },
     {
       list: of("fragment"),

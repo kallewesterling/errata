@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyHref, extractLinks } from "../../src/prose-links.js";
+import { classifyHref, extractImages, extractLinks } from "../../src/prose-links.js";
 
 const wrap = (body) => `<div>\n${body}\n</div>`;
 
@@ -105,5 +105,71 @@ describe("extractLinks", () => {
       "lesson.html",
     );
     expect(links).toHaveLength(0);
+  });
+});
+
+describe("extractImages", () => {
+  it("finds images and records the attribute they came from", () => {
+    const images = extractImages(
+      wrap('<p><img src="https://cdn.example.com/a.png" alt="A diagram"></p>'),
+      "lesson.html",
+    );
+    expect(images).toHaveLength(1);
+    expect(images[0].url).toBe("https://cdn.example.com/a.png");
+    expect(images[0].attr).toBe("src");
+    expect(images[0].scheme).toBe("http");
+  });
+
+  it("uses alt text to name the image", () => {
+    const images = extractImages(
+      wrap('<img src="https://cdn.example.com/a.png" alt="  The   build   output ">'),
+      "lesson.html",
+    );
+    expect(images[0].text).toBe("The build output");
+  });
+
+  it("reports an image with no alt text as unnamed rather than skipping it", () => {
+    const images = extractImages(
+      wrap('<img src="https://cdn.example.com/a.png">'),
+      "lesson.html",
+    );
+    expect(images).toHaveLength(1);
+    expect(images[0].text).toBe("");
+  });
+
+  it("ignores an img with no src", () => {
+    const images = extractImages(wrap('<img alt="broken">'), "lesson.html");
+    expect(images).toHaveLength(0);
+  });
+
+  it("does not confuse links with images", () => {
+    const html = wrap(
+      '<a href="https://example.com/page">text</a>' +
+        '<img src="https://cdn.example.com/a.png" alt="pic">',
+    );
+    const links = extractLinks(html, "lesson.html");
+    const images = extractImages(html, "lesson.html");
+    expect(links).toHaveLength(1);
+    expect(links[0].attr).toBe("href");
+    expect(images).toHaveLength(1);
+    expect(images[0].attr).toBe("src");
+  });
+
+  it("records a source location pointing at the src attribute", () => {
+    const images = extractImages(
+      '<div>\n<p>text</p>\n<img src="https://cdn.example.com/a.png" alt="x">\n</div>',
+      "lesson.html",
+    );
+    expect(images[0].source.file).toBe("lesson.html");
+    expect(images[0].source.line).toBe(3);
+  });
+
+  it("keeps the raw src so a rewriter can match the file", () => {
+    const images = extractImages(
+      wrap('<img src="https://cdn.example.com/a.png?w=1&amp;h=2" alt="x">'),
+      "lesson.html",
+    );
+    expect(images[0].url).toBe("https://cdn.example.com/a.png?w=1&h=2");
+    expect(images[0].rawHref).toBe("https://cdn.example.com/a.png?w=1&amp;h=2");
   });
 });

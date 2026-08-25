@@ -1,30 +1,33 @@
 /**
- * Extraction of the links in lesson prose, as opposed to the URLs that appear
- * inside code blocks.
+ * Extraction of what lesson prose points at, as opposed to the URLs that
+ * appear inside code blocks.
  *
- * These are two genuinely different populations. A URL in a code block is
- * usually data — an argument to curl, a registry host, an example endpoint —
- * and fetching all of them produces noise. An `<a href>` in prose is a promise
- * to the reader that there is something at the other end, so every one of them
- * is worth checking.
+ * These are genuinely different populations. A URL in a code block is usually
+ * data — an argument to curl, a registry host, an example endpoint — and
+ * fetching all of them produces noise. An `<a href>` is a promise to the
+ * reader that there is something at the other end, and an `<img src>` is a
+ * page element that visibly breaks when it is wrong, so both are worth
+ * checking on every occurrence.
  */
 import { parseFragment } from "parse5";
 
 /**
  * @typedef {object} RawLink
- * @property {string} url      The href value, entity-decoded.
- * @property {string} rawHref  The href exactly as it appears in the file, which
- *   is what a rewriter has to match against the source.
- * @property {string} text     Link text, collapsed to a single line.
+ * @property {string} url      The attribute value, entity-decoded.
+ * @property {string} rawHref  The value exactly as it appears in the file,
+ *   which is what a rewriter has to match against the source.
+ * @property {"href"|"src"} attr  Which attribute carried it, so a rewriter
+ *   edits the right one.
+ * @property {string} text     Link text or alt text, on a single line.
  * @property {"http"|"mailto"|"anchor"|"relative"|"other"} scheme
- * @property {number} ordinal  0-based index of this link within its file.
+ * @property {number} ordinal  0-based index within its file, per kind.
  * @property {import("./extract.js").SourceLocation} source
  */
 
-/** Collect every `<a>` element in document order. */
-function collectAnchors(node, out = []) {
-  if (node.tagName === "a") out.push(node);
-  for (const child of node.childNodes ?? []) collectAnchors(child, out);
+/** Collect every element with the given tag name, in document order. */
+function collectByTag(node, tagName, out = []) {
+  if (node.tagName === tagName) out.push(node);
+  for (const child of node.childNodes ?? []) collectByTag(child, tagName, out);
   return out;
 }
 
@@ -75,35 +78,40 @@ function rawAttrValue(html, location, fallback) {
 }
 
 /**
- * Extract every prose link from one lesson HTML file.
+ * Extract every URL-bearing element of one kind from a lesson HTML file.
  *
  * Locations come from a real parser so a finding points at the exact line, but
- * the href itself is recovered from the source text, for the same reason code
- * block contents are: what the parser hands back has already been transformed.
+ * the attribute itself is recovered from the source text, for the same reason
+ * code block contents are: what the parser hands back has already been
+ * transformed.
  *
- * @param {string} html     File contents.
- * @param {string} relPath  Path recorded in the source location.
+ * @param {string} html      File contents.
+ * @param {string} relPath   Path recorded in the source location.
+ * @param {string} tagName   Element to collect, `a` or `img`.
+ * @param {string} attrName  Attribute holding the URL, `href` or `src`.
+ * @param {(node: any) => string} describe  Human label for the element.
  * @returns {RawLink[]}
  */
-export function extractLinks(html, relPath) {
+function extract(html, relPath, tagName, attrName, describe) {
   const fragment = parseFragment(html, { sourceCodeLocationInfo: true });
-  const links = [];
+  const found = [];
 
-  collectAnchors(fragment).forEach((anchor, ordinal) => {
-    const attr = anchor.attrs?.find((a) => a.name === "href");
+  collectByTag(fragment, tagName).forEach((node, ordinal) => {
+    const attr = node.attrs?.find((a) => a.name === attrName);
     if (attr === undefined) return;
 
-    // Prefer the attribute's own location so the column points at the href
+    // Prefer the attribute's own location so the column points at the URL
     // rather than at the start of the tag.
-    const loc = anchor.sourceCodeLocation;
-    const at = loc?.attrs?.href ?? loc?.startTag ?? loc;
+    const loc = node.sourceCodeLocation;
+    const at = loc?.attrs?.[attrName] ?? loc?.startTag ?? loc;
     if (!at) return;
 
     const before = html.slice(0, at.startOffset);
-    links.push({
+    found.push({
       url: attr.value,
       rawHref: rawAttrValue(html, at, attr.value),
-      text: textOf(anchor).replace(/\s+/g, " ").trim(),
+      attr: attrName,
+      text: describe(node),
       scheme: classifyHref(attr.value),
       ordinal,
       source: {
@@ -117,5 +125,34 @@ export function extractLinks(html, relPath) {
     });
   });
 
-  return links;
+  return found;
+}
+
+/**
+ * Every `<a href>` in a lesson.
+ * @param {string} html
+ * @param {string} relPath
+ * @returns {RawLink[]}
+ */
+export function extractLinks(html, relPath) {
+  return extract(html, relPath, "a", "href", (node) =>
+    textOf(node).replace(/\s+/g, " ").trim(),
+  );
+}
+
+/**
+ * Every `<img src>` in a lesson.
+ *
+ * The alt text stands in for link text, because it is the only thing naming
+ * the image in a report — and an image with neither alt text nor a working
+ * source is doubly invisible to a reader.
+ *
+ * @param {string} html
+ * @param {string} relPath
+ * @returns {RawLink[]}
+ */
+export function extractImages(html, relPath) {
+  return extract(html, relPath, "img", "src", (node) =>
+    (node.attrs?.find((a) => a.name === "alt")?.value ?? "").replace(/\s+/g, " ").trim(),
+  );
 }
