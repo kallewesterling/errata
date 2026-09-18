@@ -50,20 +50,50 @@ export function fragmentOf(url) {
 }
 
 /**
- * True when `body` contains an element the fragment would scroll to.
+ * Prefixes that a renderer may add to a heading id.
+ *
+ * Markdown rendered through html-pipeline gets `user-content-` in front of
+ * every heading id, and the bare fragment is then resolved in the browser with
+ * JavaScript. So a reader following `#installation` lands on the heading, while
+ * the served HTML only ever contains `id="user-content-installation"`. A check
+ * that compares the fragment with the ids on the page sees no match and reports
+ * a working link as broken.
+ *
+ * This is not keyed on the hostname. The prefix is a property of the renderer
+ * rather than of GitHub, and GitLab, Gitea and Gollum all ship the same filter,
+ * so a host test would leave the same false positive in place everywhere else.
+ * The reverse error needs a page that carries a `user-content-` id without the
+ * script that reads it, which would mean shipping half of html-pipeline.
+ *
+ * The empty prefix is first, so an ordinary page costs the same as before.
+ */
+const ID_PREFIXES = ["", "user-content-"];
+
+/**
+ * True when `body` carries an element with this exact id or name.
  *
  * Matched with a regex rather than a parse because the question is narrow and
  * the alternative is parsing several hundred full documents to answer it.
  *
  * @param {string} body
- * @param {string} fragment
+ * @param {string} id
  */
-export function hasAnchor(body, fragment) {
-  const escaped = fragment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function hasId(body, id) {
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(
     `(?:id|name)\\s*=\\s*(?:"${escaped}"|'${escaped}'|${escaped}(?=[\\s/>]))`,
     "i",
   ).test(body);
+}
+
+/**
+ * True when `body` contains an element the fragment would scroll to.
+ *
+ * @param {string} body
+ * @param {string} fragment
+ */
+export function hasAnchor(body, fragment) {
+  return ID_PREFIXES.some((prefix) => hasId(body, prefix + fragment));
 }
 
 /**
