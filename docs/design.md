@@ -131,6 +131,24 @@ First, a browser never sends a fragment to a server, so a response URL can never
 
 Second, the same fact means that a naive rewrite deletes every `#section` that it touches. The link still resolves, but the sentence around it promises a section that the reader never reaches. The `comparable()` function handles the first problem. The `rewriteTarget()` function handles the second.
 
+### An anchor can be present under a prefix
+
+A fragment check compares the `#anchor` with the ids on the page. That comparison assumes the id a reader reaches is the id the server sent, and for Markdown rendered through html-pipeline it is not. That renderer prefixes every heading id with `user-content-`, and the browser resolves the bare fragment with a script. The page serves `id="user-content-installation"`, the reader follows `#installation`, and the link works.
+
+Errata therefore accepts either form. This is the most expensive false positive the tool can produce, because a reader who acts on the report replaces a working link with a different one for no reason.
+
+The rule is not keyed on the hostname, although GitHub is where it shows up. The prefix belongs to the renderer, and GitLab, Gitea and Gollum ship the same filter. To be wrong in the other direction, a page would have to carry a `user-content-` id without the script that reads it.
+
+Skipping the host instead would be worse than the false positives. The same run that produced seven false positives on GitHub also found a real one: a `#known-implementations` section that had genuinely been removed. The prefix rule keeps that finding and drops the other seven.
+
+### A thin page is not an unrenderable one
+
+A page with almost no headings looks, from the outside, like a page whose body never arrived. It is usually a section index: an `h1`, a sentence, and links to the children that hold the actual material.
+
+The distinction matters because the two call for opposite responses. A body that never arrived would mean the fragment cannot be judged. A section index means the fragment is genuinely gone, and that the page it used to sit on was split up. That is the same site reorganization that produces a moved link, arriving through the anchor instead.
+
+Errata treats a missing anchor as a missing anchor either way, and that is correct. Confirm against a content page on the same host before concluding that a host cannot be checked.
+
 ### Which redirects errata applies without a person
 
 A 301 response tells you where a page went. But not every 301 response describes a page move. Sites also use a 301 to sweep a retired section onto a landing page. If errata follows one of those, it turns a precise reference into a vague one, and it reports success. That result is worse than no change at all.

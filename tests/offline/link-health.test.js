@@ -96,6 +96,22 @@ describe("hasAnchor", () => {
     expect(hasAnchor('<h2 id="a.b">', "a.b")).toBe(true);
     expect(hasAnchor('<h2 id="axb">', "a.b")).toBe(false);
   });
+
+  // GitHub serves `id="user-content-installation"` and resolves `#installation`
+  // in the browser, so the bare fragment never appears as an id on the page.
+  it("matches a heading id behind the user-content prefix", () => {
+    expect(hasAnchor('<a id="user-content-installation"></a>', "installation")).toBe(true);
+    expect(hasAnchor("<a id=user-content-installation></a>", "installation")).toBe(true);
+  });
+
+  it("still reports a fragment the prefixed page does not carry", () => {
+    const body = '<a id="user-content-adopters"></a><a id="user-content-support"></a>';
+    expect(hasAnchor(body, "known-implementations")).toBe(false);
+  });
+
+  it("does not let the prefix match a fragment that already carries it", () => {
+    expect(hasAnchor('<h2 id="intro">', "user-content-intro")).toBe(false);
+  });
 });
 
 describe("judge", () => {
