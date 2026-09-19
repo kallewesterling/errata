@@ -38,6 +38,26 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- `script-entity`, a check for HTML entities inside an inline `<script>`
+  (`src/scripts.js`). A `<script>` is a raw-text element, so an entity in one is
+  never decoded, and nothing downstream decodes it either — the resources widget
+  sets its text with `textContent` and passes its link through `sanitizeUrl()`.
+  The reader gets the five characters `&amp;` where an ampersand was meant.
+
+  In a URL it is worse than cosmetic. Four YouTube links in the content carry
+  `watch?v=...&amp;t=2691s`: the address still resolves, so every link check
+  passes, while the timestamp the author linked to is dropped.
+
+  The rule inverts at the `<script>` boundary, which is why this needs a tool.
+  `&rsquo;` is correct in the prose of the same file, so an author applying the
+  prose convention consistently is exactly how this gets written. Against the
+  courses content the check finds 23 occurrences across 13 files — 12 `&rsquo;`,
+  6 `&mdash;`, 5 `&amp;` — which matches a manual count made independently.
+
+  Findings are fingerprinted against the whole script body rather than the
+  single entity, so repairing one entity reopens the others in that script
+  instead of leaving them accepted against a body that has changed.
+
 - Design notes on the prefix rule, and on telling a section index apart from a
   page whose body never arrived (`docs/design.md`). A page carrying almost no
   headings looks like a site that renders in the browser and is usually just an
