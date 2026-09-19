@@ -11,7 +11,7 @@
  */
 import path from "node:path";
 import { anomalies, configFile, contentRoot, repoRoot } from "./config.js";
-import { getInventory } from "./inventory.js";
+import { getInventory, getScriptEntities } from "./inventory.js";
 import {
   checkContentPaths,
   findUnreferencedContentFiles,
@@ -19,7 +19,7 @@ import {
 import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
 import { indexIssues, loadKnownIssues } from "./known-issues.js";
 import { LINK_PROBLEM_IDS } from "./link-health.js";
-import { blockItem, style } from "./report.js";
+import { blockItem, blockLocation, style } from "./report.js";
 import { REMEDIATION, warningItem } from "./warnings.js";
 
 /**
@@ -80,6 +80,7 @@ const ANOMALY_HELP = {
  */
 export function collectProblems(blocks = getInventory()) {
   const outputs = blocks.filter((b) => b.kind === "output");
+  const scriptEntities = getScriptEntities();
   const { caseMismatches, missing } = checkContentPaths();
   const warnings = blocks.flatMap((b) =>
     b.warnings.map((w) => ({ ...w, fingerprint: b.fingerprint })),
@@ -235,6 +236,28 @@ export function collectProblems(blocks = getInventory()) {
           ["declared", m.declared],
           ["on disk", m.actual],
         ],
+      })),
+    },
+    {
+      id: "script-entity",
+      title: "HTML entities inside an inline <script>",
+      why:
+        "A <script> is a raw-text element, so an entity inside one is never " +
+        "decoded, and nothing downstream decodes it either. The reader sees " +
+        "the five characters &amp; where an ampersand was meant. In a URL it " +
+        "is worse than cosmetic: the address still resolves, so every link " +
+        "check passes, while the query string it was carrying is broken.",
+      fix:
+        "Replace the entity with the character it stands for, then re-parse " +
+        "the script to confirm the edit left valid JavaScript. Note that the " +
+        "rule inverts here: the same entity is correct in the prose of the " +
+        "same file, so fix it inside the <script> only.",
+      items: scriptEntities.map((finding) => ({
+        summary: `${style.bad(finding.entity)}  ${style.muted(finding.id)}`,
+        key: finding.id,
+        fingerprint: finding.fingerprint,
+        details: [["in", finding.context]],
+        locations: [blockLocation(finding)],
       })),
     },
     {
