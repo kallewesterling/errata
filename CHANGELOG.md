@@ -38,6 +38,35 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- `code-trailing-space`, a check for an inline `<code>` whose text ends in a
+  space (`src/inline-code.js`, `src/residue.js`). There is no reason to write
+  `<code>--parent </code>` unless something used to follow the flag. The rule
+  is confined to inline `<code>`, because trailing whitespace inside
+  `<pre><code>` is ordinary — a block that ends in a newline has it.
+
+- `placeholder-residue`, a check for the destructive half of the placeholder
+  problem (`src/residue.js`). The existing `unescaped-markup` anomaly catches a
+  literal `<tag>` still sitting in a block. This catches the case where the
+  parser already ate it and only the hole is left: `--parent  --ttl 30m`,
+  `identity ""`, `--username ""`, `identity: `, `--github-repo='/.*'`.
+
+  Rules were selected by measuring them against the content twice, before and
+  after its own repair pass, on the principle that a rule worth having drops to
+  near zero once the defects are fixed. Together the two checks find 15
+  findings before the repair and 1 after, and that one is a genuine
+  `short_description: ` nobody has filled in. Source blocks are excluded from
+  the scan, which removes the largest false-positive class — `return ""` in Go
+  and `print("".join(parts))` in Python are ordinary code.
+
+  Three shapes from the request are not implemented, and the measurement is why.
+  "A full stop with nothing before it" found 51 sites of which 2 were real: the
+  other 49 are `docker build .` and `docker build -t name .`. Matching
+  `key: ""` as well as `key: ` took that rule from 2 findings to 8 and added
+  nothing real, because `source: ""` is an ordinary empty config value. A
+  subcommand missing its required argument cannot be recognized without knowing
+  the command's signature. The first two need a command taxonomy errata does
+  not have; all three are recorded in `src/residue.js`.
+
 - `script-entity`, a check for HTML entities inside an inline `<script>`
   (`src/scripts.js`). A `<script>` is a raw-text element, so an entity in one is
   never decoded, and nothing downstream decodes it either — the resources widget

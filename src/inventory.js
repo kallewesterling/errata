@@ -4,6 +4,7 @@ import { duplication, repoRoot } from "./config.js";
 import { classify } from "./classify.js";
 import { sentences, shingles, visibleText, words } from "./duplication.js";
 import { extractBlocks, fingerprint } from "./extract.js";
+import { extractInlineCode } from "./inline-code.js";
 import { resolveContentFile } from "./integrity.js";
 import { lessonUrl, loadCourses } from "./mirror.js";
 import { linkBlocks } from "./pairing.js";
@@ -258,6 +259,67 @@ let cachedScripts = null;
 export function getScriptEntities() {
   cachedScripts ??= buildScriptInventory();
   return cachedScripts;
+}
+
+/**
+ * @typedef {object} InlineCodeItem
+ * @property {string} id           Stable composite identity.
+ * @property {string} fingerprint  Hash of the element's text.
+ * @property {string} text         The text a reader sees.
+ * @property {import("./extract.js").SourceLocation} source
+ * @property {string} editorRef
+ * @property {string|null} url     Public lesson URL.
+ * @property {{dir: string, id: string|null, title: string}} course
+ * @property {{id: string, slug: string, title: string}} lesson
+ * @property {{id: string, order: number}} contentItem
+ */
+
+/**
+ * Build the inventory of `<code>` elements appearing in prose.
+ *
+ * Separate from the block inventory because the two differ on what counts as
+ * well-formed: a block legitimately ends in a newline, and an inline element
+ * does not.
+ *
+ * @returns {InlineCodeItem[]}
+ */
+export function buildInlineCodeInventory() {
+  const found = [];
+
+  for (const course of loadCourses()) {
+    for (const lesson of course.lessons) {
+      for (const item of lesson.content_items ?? []) {
+        const absFile = resolveContentFile(course.absPath, item.file);
+        if (!absFile) continue;
+
+        const html = fs.readFileSync(absFile, "utf8");
+        const relPath = path.relative(repoRoot, absFile);
+
+        for (const raw of extractInlineCode(html, relPath)) {
+          found.push({
+            id: `${course.dir}/${lesson.slug}/${item.id}#code${raw.ordinal}`,
+            fingerprint: fingerprint(raw.text),
+            text: raw.text,
+            source: raw.source,
+            editorRef: `${relPath}:${raw.source.line}:${raw.source.column}`,
+            url: lessonUrl(course, lesson),
+            course: { dir: course.dir, id: course.id, title: course.title },
+            lesson: { id: lesson.id, slug: lesson.slug, title: lesson.title },
+            contentItem: { id: item.id, order: item.order },
+          });
+        }
+      }
+    }
+  }
+
+  return found;
+}
+
+let cachedInlineCode = null;
+/** Memoized inventory of inline `<code>` elements. */
+export function getInlineCode() {
+  cachedInlineCode ??= buildInlineCodeInventory();
+  return cachedInlineCode;
 }
 
 /**

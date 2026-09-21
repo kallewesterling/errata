@@ -11,7 +11,7 @@
  */
 import path from "node:path";
 import { anomalies, configFile, contentRoot, repoRoot } from "./config.js";
-import { getInventory, getScriptEntities } from "./inventory.js";
+import { getInlineCode, getInventory, getScriptEntities } from "./inventory.js";
 import {
   checkContentPaths,
   findUnreferencedContentFiles,
@@ -20,6 +20,7 @@ import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
 import { indexIssues, loadKnownIssues } from "./known-issues.js";
 import { LINK_PROBLEM_IDS } from "./link-health.js";
 import { blockItem, blockLocation, style } from "./report.js";
+import { RESIDUE_KINDS, endsInSpace, findResidue } from "./residue.js";
 import { REMEDIATION, warningItem } from "./warnings.js";
 
 /**
@@ -81,6 +82,7 @@ const ANOMALY_HELP = {
 export function collectProblems(blocks = getInventory()) {
   const outputs = blocks.filter((b) => b.kind === "output");
   const scriptEntities = getScriptEntities();
+  const inlineCode = getInlineCode();
   const { caseMismatches, missing } = checkContentPaths();
   const warnings = blocks.flatMap((b) =>
     b.warnings.map((w) => ({ ...w, fingerprint: b.fingerprint })),
@@ -237,6 +239,58 @@ export function collectProblems(blocks = getInventory()) {
           ["on disk", m.actual],
         ],
       })),
+    },
+    {
+      id: "code-trailing-space",
+      title: "inline <code> elements whose text ends in a space",
+      why:
+        "There is no reason to write <code>--parent </code> unless something " +
+        "used to follow the flag. A <pre> is not a raw-text element, so a " +
+        "literal <organization> written into one is parsed as an unknown tag " +
+        "and dropped without trace, and a trailing space is what it leaves.",
+      fix:
+        "Restore the value that was there, written as escaped angle brackets " +
+        "so the parser cannot eat it again: &lt;organization&gt;. If nothing " +
+        "was lost, delete the trailing space.",
+      items: inlineCode.filter((c) => endsInSpace(c.text)).map((c) => ({
+        summary: `${style.bad(`<code>${c.text}</code>`)}  ${style.muted(c.id)}`,
+        key: c.id,
+        fingerprint: c.fingerprint,
+        locations: [blockLocation(c)],
+      })),
+    },
+    {
+      id: "placeholder-residue",
+      severity: "warning",
+      title: "blocks that look like a placeholder was eaten",
+      why:
+        "The unescaped-markup anomaly catches a literal <tag> still sitting " +
+        "in a block. This is the destructive case, where the parser already " +
+        "consumed it and only the hole is left: a dangling flag, an empty " +
+        "quoted string, a key with no value. Nothing in the file records " +
+        "that anything was lost, so it has to be inferred from the shape.",
+      fix:
+        "Compare against the lesson's own prose and any intact copy of the " +
+        "same block elsewhere, restore the value, and write it as " +
+        "&lt;organization&gt; so it survives the next parse. These are " +
+        "heuristics: if the shape is legitimate, accept it in the " +
+        "known-issues file with that as the reason.",
+      items: blocks
+        .filter((b) => RESIDUE_KINDS.has(b.kind))
+        .flatMap((block) =>
+          findResidue(block.code).map((found) => ({
+            summary: `${style.bad(found.match)}  ${style.muted(block.id)}`,
+            // Keyed by rule as well as block, so accepting one shape in a
+            // block does not silently accept the next one to appear in it.
+            key: `${block.id} ${found.rule}`,
+            fingerprint: block.fingerprint,
+            details: [
+              ["suspected because", found.what],
+              ["line", found.line],
+            ],
+            locations: [blockLocation(block)],
+          })),
+        ),
     },
     {
       id: "script-entity",
