@@ -8,6 +8,7 @@ import { resolveContentFile } from "./integrity.js";
 import { lessonUrl, loadCourses } from "./mirror.js";
 import { linkBlocks } from "./pairing.js";
 import { extractImages, extractLinks } from "./prose-links.js";
+import { extractScriptEntities } from "./scripts.js";
 import { collectWarnings } from "./warnings.js";
 
 /**
@@ -194,6 +195,69 @@ let cachedLinks = null;
 export function getLinks() {
   cachedLinks ??= buildLinkInventory();
   return cachedLinks;
+}
+
+/**
+ * @typedef {object} ScriptFinding
+ * @property {string} id           Stable composite identity.
+ * @property {string} fingerprint  Hash of the script body.
+ * @property {string} entity       The entity exactly as written.
+ * @property {string} context      Surrounding source, for recognizing it.
+ * @property {import("./extract.js").SourceLocation} source
+ * @property {string} editorRef
+ * @property {string|null} url     Public lesson URL.
+ * @property {{dir: string, id: string|null, title: string}} course
+ * @property {{id: string, slug: string, title: string}} lesson
+ * @property {{id: string, order: number}} contentItem
+ */
+
+/**
+ * Build the inventory of HTML entities sitting inside inline `<script>`.
+ *
+ * Separate from the block inventory because a `<script>` is not a code block a
+ * reader is meant to run: it is page machinery, and the defect in it is
+ * invisible in the rendered lesson rather than wrong on the page.
+ *
+ * @returns {ScriptFinding[]}
+ */
+export function buildScriptInventory() {
+  const found = [];
+
+  for (const course of loadCourses()) {
+    for (const lesson of course.lessons) {
+      for (const item of lesson.content_items ?? []) {
+        const absFile = resolveContentFile(course.absPath, item.file);
+        if (!absFile) continue;
+
+        const html = fs.readFileSync(absFile, "utf8");
+        const relPath = path.relative(repoRoot, absFile);
+
+        for (const raw of extractScriptEntities(html, relPath)) {
+          found.push({
+            id: `${course.dir}/${lesson.slug}/${item.id}#script${raw.ordinal}`,
+            fingerprint: raw.fingerprint,
+            entity: raw.entity,
+            context: raw.context,
+            source: raw.source,
+            editorRef: `${relPath}:${raw.source.line}:${raw.source.column}`,
+            url: lessonUrl(course, lesson),
+            course: { dir: course.dir, id: course.id, title: course.title },
+            lesson: { id: lesson.id, slug: lesson.slug, title: lesson.title },
+            contentItem: { id: item.id, order: item.order },
+          });
+        }
+      }
+    }
+  }
+
+  return found;
+}
+
+let cachedScripts = null;
+/** Memoized inventory of entities inside inline scripts. */
+export function getScriptEntities() {
+  cachedScripts ??= buildScriptInventory();
+  return cachedScripts;
 }
 
 /**
