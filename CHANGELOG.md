@@ -52,20 +52,33 @@ tagged; it is the version `package.json` declared while the work landed.
 
   Rules were selected by measuring them against the content twice, before and
   after its own repair pass, on the principle that a rule worth having drops to
-  near zero once the defects are fixed. Together the two checks find 15
+  near zero once the defects are fixed. Together the two checks find 17
   findings before the repair and 1 after, and that one is a genuine
-  `short_description: ` nobody has filled in. Source blocks are excluded from
-  the scan, which removes the largest false-positive class — `return ""` in Go
-  and `print("".join(parts))` in Python are ordinary code.
+  `short_description: ` nobody has filled in.
 
-  Three shapes from the request are not implemented, and the measurement is why.
-  "A full stop with nothing before it" found 51 sites of which 2 were real: the
-  other 49 are `docker build .` and `docker build -t name .`. Matching
-  `key: ""` as well as `key: ` took that rule from 2 findings to 8 and added
-  nothing real, because `source: ""` is an ordinary empty config value. A
-  subcommand missing its required argument cannot be recognized without knowing
-  the command's signature. The first two need a command taxonomy errata does
-  not have; all three are recorded in `src/residue.js`.
+  Two rules are scoped rather than global, and the scope is most of what makes
+  them work. Source blocks are excluded from the scan entirely, because
+  `return ""` in Go and `print("".join(parts))` in Python are ordinary code
+  while placeholder residue is a defect of command documentation. And
+  `dangling-period` reads only output lines — an `ansi` block, or the
+  unprompted lines of a `console` block. Applied everywhere it reported 53
+  sites of which 2 were real, because a trailing `.` is how a build context and
+  a copy destination are written: `docker build -t name .`,
+  `COPY requirements.txt .`. Every one of those is a command or a Dockerfile.
+  Confined to output, where a full stop ends a sentence rather than naming a
+  directory, it reports the 2 and nothing else.
+
+  Two narrowings came from the same measurement. `empty-key-value` requires the
+  trailing space that separated key from value: `plugins:` introducing nested
+  content is correct, and matching any key at a line end reported every parent
+  key in every YAML block. Matching `key: ""` as well took it from 2 findings
+  to 8 and added nothing real, because `source: ""` is an ordinary empty value.
+  `eaten-before-slash` is anchored to a long-form flag, since matching any
+  `= "/` reported every absolute path in a Terraform block.
+
+  One shape from the request is not implemented: a subcommand missing its
+  required argument cannot be recognized without knowing the command's
+  signature. It is recorded in `src/residue.js` rather than dropped silently.
 
 - `script-entity`, a check for HTML entities inside an inline `<script>`
   (`src/scripts.js`). A `<script>` is a raw-text element, so an entity in one is

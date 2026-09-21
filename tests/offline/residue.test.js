@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import { endsInSpace, findResidue } from "../../src/residue.js";
 import { extractInlineCode } from "../../src/inline-code.js";
 
-/** Rule ids that fire on a piece of text. */
-const rules = (text) => findResidue(text).map((f) => f.rule);
+/** Rule ids that fire on a block whose text is all command-side. */
+const rules = (code) =>
+  findResidue({ kind: "shell", code, shell: { commands: [], output: [] } }).map(
+    (f) => f.rule,
+  );
+
+/** Rule ids that fire on lines the reader is shown rather than told to type. */
+const outputRules = (code) =>
+  findResidue({ kind: "output", code, shell: null }).map((f) => f.rule);
 
 describe("findResidue", () => {
   // Every example below is real, from
@@ -32,6 +39,43 @@ describe("findResidue", () => {
     it("finds a flag whose value starts at a path separator", () => {
       expect(rules("--github-repo='/.*'")).toContain("eaten-before-slash");
     });
+
+    it("finds an output line ending in a full stop with nothing before it", () => {
+      const text = 'Creating role "my-example-role" under location .';
+      expect(outputRules(text)).toContain("dangling-period");
+    });
+  });
+
+  // This rule is scoped to output for one reason, and these are it. A
+  // trailing `.` is how a build context and a copy destination are written,
+  // and every one of those is a command or a Dockerfile. Unscoped, the rule
+  // reported 53 sites across the content of which 2 were real.
+  describe("the full-stop rule stays out of the command side", () => {
+    for (const command of [
+      "$ docker build -t c-distroless .",
+      "$ docker build . -t example-php-image",
+      "$ docker cp java-lib-example-1:/app/java-demo-app-1.0.0.jar .",
+      "COPY requirements.txt .",
+      "COPY --from=builder /work/target/java-demo-app-1.0.0.jar .",
+    ]) {
+      it(`leaves alone: ${command}`, () => {
+        expect(rules(command)).not.toContain("dangling-period");
+      });
+    }
+
+    it("reads the unprompted lines of a console block as output", () => {
+      // The content uses both conventions, so scoping to `ansi` blocks alone
+      // would only see half the output in the corpus.
+      const block = {
+        kind: "shell",
+        code: '$ chainctl iam roles create\nCreating role "x" under location .',
+        shell: {
+          commands: ["chainctl iam roles create"],
+          output: ['Creating role "x" under location .'],
+        },
+      };
+      expect(findResidue(block).map((f) => f.rule)).toContain("dangling-period");
+    });
   });
 
   describe("what it leaves alone", () => {
@@ -54,13 +98,6 @@ describe("findResidue", () => {
       expect(rules("$ pip install requests==2.31.0")).toEqual([]);
     });
 
-    // Measured over the content, a rule for "a full stop with nothing before
-    // it" found 51 sites of which 2 were real. These are the other 49.
-    it("does not flag a build context, which is why that shape was dropped", () => {
-      expect(rules("$ docker build . -t example-php-image")).toEqual([]);
-      expect(rules("$ docker build -t c-distroless .")).toEqual([]);
-    });
-
     // An empty value in a sample config is ordinary. Including `key: ""` took
     // the rule from 2 findings to 8 and added nothing real.
     it("does not flag an explicitly empty config value", () => {
@@ -78,7 +115,11 @@ describe("findResidue", () => {
   });
 
   it("quotes the line, so a finding names something recognizable", () => {
-    const [found] = findResidue("$ chainctl auth pull-token --parent  --ttl 30m");
+    const [found] = findResidue({
+      kind: "shell",
+      code: "$ chainctl auth pull-token --parent  --ttl 30m",
+      shell: { commands: [], output: [] },
+    });
     expect(found.line).toBe("$ chainctl auth pull-token --parent  --ttl 30m");
     expect(found.what).toBe("a long-form flag followed by two or more spaces");
   });

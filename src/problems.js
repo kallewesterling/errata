@@ -278,7 +278,7 @@ export function collectProblems(blocks = getInventory()) {
       items: blocks
         .filter((b) => RESIDUE_KINDS.has(b.kind))
         .flatMap((block) =>
-          findResidue(block.code).map((found) => ({
+          findResidue(block).map((found) => ({
             summary: `${style.bad(found.match)}  ${style.muted(block.id)}`,
             // Keyed by rule as well as block, so accepting one shape in a
             // block does not silently accept the next one to appear in it.

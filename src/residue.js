@@ -36,29 +36,33 @@ export const RESIDUE_KINDS = new Set(["shell", "output", "config"]);
  *
  * Each `what` completes the sentence "this looks like residue because it is".
  *
- * @type {{id: string, what: string, pattern: RegExp}[]}
+ * @type {{id: string, scope: "any"|"output", what: string, pattern: RegExp}[]}
  */
 export const RESIDUE_RULES = [
   {
     id: "dangling-flag",
+    scope: "any",
     what: "a long-form flag followed by two or more spaces",
     // `--parent  --ttl 30m`, where the value between them was eaten.
     pattern: /(?:^|\s)--[a-z][a-z0-9-]*\s{2,}(?=\S)/im,
   },
   {
     id: "empty-flag-value",
+    scope: "any",
     what: "a flag given an empty string",
     // `--username ""`
     pattern: /(?:^|\s)--[a-z][a-z0-9-]*[= ]\s*(?:""|'')/im,
   },
   {
     id: "empty-quoted-value",
+    scope: "any",
     what: "a bare word followed by an empty string",
     // `identity ""` in output, where the identity should have been named.
     pattern: /[a-z][a-z0-9_-]*\s+(?:""|'')/i,
   },
   {
     id: "empty-key-value",
+    scope: "any",
     what: "a key left with trailing space and no value",
     // `identity: ` in a workflow YAML.
     //
@@ -73,6 +77,7 @@ export const RESIDUE_RULES = [
   },
   {
     id: "eaten-before-slash",
+    scope: "any",
     what: "a flag whose value starts at a path separator",
     // `--github-repo='/.*'`, written as `='<organization>/.*'`.
     //
@@ -81,24 +86,33 @@ export const RESIDUE_RULES = [
     // a Terraform block, which is 11 findings of nothing.
     pattern: /--[a-z][a-z0-9-]*=["']\//i,
   },
+  {
+    id: "dangling-period",
+    scope: "output",
+    what: "an output line ending in a full stop with nothing before it",
+    // `Creating role "x" under location .`
+    //
+    // The scope is the whole rule. Applied to everything, this reports 53
+    // sites of which 2 are real, because a trailing `.` is how a build
+    // context and a copy destination are written: `docker build -t name .`,
+    // `COPY requirements.txt .`, `docker cp container:/app/thing .`. All of
+    // those are commands or Dockerfiles. Confined to output lines, where a
+    // trailing full stop ends a sentence rather than naming a directory, it
+    // reports the 2 and nothing else.
+    pattern: /\w[ \t]+\.[ \t]*$/m,
+  },
 ];
 
 /**
  * One shape from the original request is deliberately not implemented.
  *
- * `Creating role "x" under location .` is real residue, but no rule for it
- * survives contact with the corpus: a full stop after a word is also how
- * `docker build .` and `docker build -t name .` end, and those are correct.
- * Measured across the content, the rule found 51 sites of which 2 were real.
- * Telling the two apart needs to know which tokens are commands and which
- * arguments are paths, which is a command taxonomy errata does not have.
- *
- * The other shape left out is a subcommand missing its required argument,
- * such as `chainctl iam role-bindings delete`, for the same reason: it cannot
- * be recognized without knowing the command's signature.
+ * A subcommand missing its required argument, such as
+ * `chainctl iam role-bindings delete`, cannot be recognized without knowing
+ * the command's signature. That is a command taxonomy errata does not have,
+ * and inferring it from the corpus would mean treating every subcommand the
+ * content happens to show with an argument as one that requires an argument.
  */
 export const UNIMPLEMENTED_SHAPES = Object.freeze([
-  "a full stop with nothing before it",
   "a subcommand missing its required argument",
 ]);
 
@@ -111,19 +125,50 @@ export const UNIMPLEMENTED_SHAPES = Object.freeze([
  */
 
 /**
- * Every residue shape present in a piece of text.
+ * The part of a block these rules read.
+ *
+ * Declared structurally rather than as a `CodeBlock` so the rules state their
+ * own inputs and a test can write a block by hand.
+ *
+ * @typedef {object} ResidueBlock
+ * @property {string} kind
+ * @property {string} code
+ * @property {{commands: string[], output: string[]}|null} [shell]
+ */
+
+/**
+ * The text a rule of the given scope is allowed to see.
+ *
+ * `any` reads the whole block. `output` reads only the lines the reader is
+ * being shown rather than told to type: an `ansi` block entire, or the
+ * unprompted lines of a `console` block. Both conventions appear in the
+ * content, so reading only one of them would miss half the population.
+ *
+ * @param {ResidueBlock} block
+ * @param {string} scope
+ */
+function textForScope(block, scope) {
+  if (scope !== "output") return block.code;
+  const lines =
+    block.kind === "output" ? block.code.split("\n") : (block.shell?.output ?? []);
+  return lines.join("\n");
+}
+
+/**
+ * Every residue shape present in a block.
  *
  * At most one finding per rule, because a block that lost three placeholders
  * to the same cause is one repair, and reporting it three times would push the
  * other blocks off the end of the report.
  *
- * @param {string} text
+ * @param {ResidueBlock} block
  * @returns {Residue[]}
  */
-export function findResidue(text) {
+export function findResidue(block) {
   const found = [];
 
   for (const rule of RESIDUE_RULES) {
+    const text = textForScope(block, rule.scope);
     const match = text.match(rule.pattern);
     if (!match) continue;
 
