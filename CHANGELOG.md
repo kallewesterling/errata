@@ -38,6 +38,27 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- `prompted-output`, a check for an output line wearing a command prompt
+  (`src/output-prefixes.js`). A `$` prefix means "type this", so output that
+  picks one up invites a reader to run something that is not a command. The
+  case that prompted it reads `$ fetch https://packages.wolfi.dev/...`, where
+  `fetch` is what apk prints while it works.
+
+  The evidence is a census of the corpus rather than a pattern, because no
+  single-file rule can see this: a block with a prompt and mixed content is
+  also the sanctioned convention where output follows the command inside one
+  block, and `promptless-shell` looks for the opposite defect. A token that
+  repeatedly heads an unprompted line elsewhere, and hardly ever heads a
+  command, is an output prefix wherever it appears with a prompt in front.
+
+  Thresholds were chosen by measuring against the content before and after its
+  own repair pass. Requiring two output sightings rather than one is the knee:
+  at one the rule reports a site that survived the repair, at two it reports
+  exactly the two real defects and nothing else, and it stays there however far
+  the command-sightings guard moves. Both findings are ones the content audit
+  had already identified by hand — the `fetch` line, and a container prompt
+  that had picked up a spurious `$`.
+
 - `code-trailing-space`, a check for an inline `<code>` whose text ends in a
   space (`src/inline-code.js`, `src/residue.js`). There is no reason to write
   `<code>--parent </code>` unless something used to follow the flag. The rule

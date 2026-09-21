@@ -20,6 +20,7 @@ import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
 import { indexIssues, loadKnownIssues } from "./known-issues.js";
 import { LINK_PROBLEM_IDS } from "./link-health.js";
 import { blockItem, blockLocation, style } from "./report.js";
+import { findPromptedOutput } from "./output-prefixes.js";
 import { RESIDUE_KINDS, endsInSpace, findResidue } from "./residue.js";
 import { REMEDIATION, warningItem } from "./warnings.js";
 
@@ -238,6 +239,36 @@ export function collectProblems(blocks = getInventory()) {
           ["declared", m.declared],
           ["on disk", m.actual],
         ],
+      })),
+    },
+    {
+      id: "prompted-output",
+      title: "output lines wearing a command prompt",
+      why:
+        "A $ prefix means \"type this\", so a line of program output that " +
+        "picks up one invites a reader to run something that is not a " +
+        "command. The corpus says these tokens are output: each heads an " +
+        "unprompted line in other lessons and hardly ever heads a command. " +
+        "No single-file rule can see this, because a block with a prompt and " +
+        "mixed content is also the sanctioned command-plus-output convention.",
+      fix:
+        "Move the line out of the command position. Either drop the $ so it " +
+        "reads as output inside the same block, or put it in a separate ansi " +
+        "block, matching whichever convention the lesson already uses.",
+      items: findPromptedOutput(blocks).map((found) => ({
+        summary: `${style.bad(found.command)}  ${style.muted(found.block.id)}`,
+        // Keyed by command as well as block: one block can carry two, and
+        // accepting one must not quietly accept the other.
+        key: `${found.block.id} ${found.token}`,
+        fingerprint: found.block.fingerprint,
+        details: [
+          ["token", found.token],
+          [
+            "corpus",
+            `heads an output line ${found.asOutput} times, a command ${found.asCommand}`,
+          ],
+        ],
+        locations: [blockLocation(found.block)],
       })),
     },
     {
