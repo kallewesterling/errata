@@ -18,8 +18,10 @@
 name: Tests
 
 on:
+  # Every pull request, whatever it targets. A filter on `main` means a branch
+  # opened against another branch runs nothing, which is exactly the case where
+  # a reviewer is least able to tell by eye whether the suite still passes.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
