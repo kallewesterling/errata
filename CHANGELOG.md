@@ -38,6 +38,42 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- Six small checks, each measured against the content before and after its own
+  repair pass. Together they find 51 sites before it and 4 after, and all four
+  of those are real and still open.
+
+  - `comment-in-block` — an HTML comment inside a `<pre>` (4 before, 2 after).
+    The browser drops it, so it is either invisible instructions to the reader
+    or a note that escaped review. One lesson shows a command followed by
+    `<!-- TODO: insert output here -->`, so the reader gets an empty box while
+    the prose below promises what they should see. Scoped to `<pre>`: 52 files
+    carry a comment somewhere and outside a block that is ordinary.
+  - `code-typography` — a curly quote, ellipsis character, dash or
+    non-breaking space inside a code block (8, 0). A block gets pasted into a
+    shell, so anything that survives the clipboard but not the shell is a
+    defect; `&nbsp;` indentation in one lesson put U+00A0 into the reader's
+    terminal. These characters are correct in prose, so this is also what
+    checks that a typography pass skipped `<pre>` and `<code>`.
+  - `mislabeled-dockerfile` — a block that opens with `FROM` but is not
+    labelled `dockerfile` (20, 0). The test is that the block *opens* with it,
+    which is what makes it safe: a SQL statement can put a `FROM` clause on its
+    own line, and nothing that is not a Dockerfile begins with one.
+  - `unused-lang` — a language in the taxonomy no block uses (0, 2). Inverted
+    against the others, because normalizing `docker` to `dockerfile` is what
+    left `docker` and `markup` permitted and unwritten. An unused alias is how
+    a corpus ends up with two spellings for one language.
+  - `markdown-in-prose` — backticks, bold or link syntax outside a code
+    element (15, 0), reported once per file rather than once per occurrence.
+    Backticks *inside* a `<pre>` are left alone: there they are command
+    substitution, ASCII art or captured output.
+  - `flattened-command` — a `<p>` or `<li>` carrying a long-form flag and its
+    value, outside any code element (4, 0). Prose naming a tool is ordinary;
+    prose carrying `--parent example.com` is a block that lost its `<pre>`.
+
+  The prose checks work by blanking every `<pre>`, `<code>` and `<script>`
+  region with the same number of spaces, so offsets survive and a finding still
+  points at a real line and column.
+
 - `prompted-output`, a check for an output line wearing a command prompt
   (`src/output-prefixes.js`). A `$` prefix means "type this", so output that
   picks one up invites a reader to run something that is not a command. The
