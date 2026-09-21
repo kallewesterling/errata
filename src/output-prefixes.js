@@ -41,6 +41,25 @@ const MIN_OUTPUT_SIGHTINGS = 2;
  */
 const MAX_COMMAND_SIGHTINGS = 2;
 
+/**
+ * The part of a block this census reads.
+ *
+ * Declared structurally rather than as a `CodeBlock` so the rule states its
+ * own inputs, and so a test can put a corpus together by hand. The whole
+ * question here is what the rest of the content says about a token, which
+ * makes a hand-written corpus the clearest way to write a test — and an
+ * unreadable one if it has to carry twenty fields the rule never looks at.
+ *
+ * @typedef {object} CensusBlock
+ * @property {string} id
+ * @property {string} fingerprint
+ * @property {string} kind
+ * @property {string} code
+ * @property {{commands: string[], output: string[]}|null} shell
+ * @property {string} editorRef
+ * @property {string|null} url
+ */
+
 /** The first whitespace-separated token of a line, or "" when there is none. */
 const firstToken = (line) => line.trim().split(/\s+/)[0] ?? "";
 
@@ -50,7 +69,7 @@ const firstToken = (line) => line.trim().split(/\s+/)[0] ?? "";
  * Output is taken from two places, because the content uses both conventions:
  * a separate `ansi` block, and unprompted lines inside a `console` block.
  *
- * @param {import("./inventory.js").CodeBlock[]} blocks
+ * @param {CensusBlock[]} blocks
  */
 export function censusPrefixes(blocks) {
   const asOutput = new Map();
@@ -74,7 +93,7 @@ export function censusPrefixes(blocks) {
 
 /**
  * @typedef {object} PromptedOutput
- * @property {import("./inventory.js").CodeBlock} block
+ * @property {CensusBlock} block
  * @property {string} command  The prompted line, as written.
  * @property {string} token    The token the census objected to.
  * @property {number} asOutput   Times it heads an output line in the corpus.
@@ -84,7 +103,7 @@ export function censusPrefixes(blocks) {
 /**
  * Every prompted line whose first token the corpus says is output.
  *
- * @param {import("./inventory.js").CodeBlock[]} blocks
+ * @param {CensusBlock[]} blocks
  * @returns {PromptedOutput[]}
  */
 export function findPromptedOutput(blocks) {
