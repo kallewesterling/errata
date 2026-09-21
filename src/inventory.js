@@ -8,6 +8,7 @@ import { extractInlineCode } from "./inline-code.js";
 import { resolveContentFile } from "./integrity.js";
 import { lessonUrl, loadCourses } from "./mirror.js";
 import { linkBlocks } from "./pairing.js";
+import { findProseDefects } from "./prose-defects.js";
 import { extractImages, extractLinks } from "./prose-links.js";
 import { extractScriptEntities } from "./scripts.js";
 import { collectWarnings } from "./warnings.js";
@@ -375,4 +376,62 @@ export function getTexts() {
 /** Human-readable pointer used in assertion messages. */
 export function describe(block) {
   return `${block.id}\n    ${block.editorRef}${block.url ? `\n    ${block.url}` : ""}`;
+}
+
+/**
+ * @typedef {object} ProseDefectItem
+ * @property {string} id           Stable composite identity.
+ * @property {string} fingerprint  Hash of the matched text.
+ * @property {string} kind
+ * @property {string} rule
+ * @property {string} what
+ * @property {string} match
+ * @property {import("./extract.js").SourceLocation} source
+ * @property {string} editorRef
+ * @property {string|null} url
+ */
+
+/**
+ * Build the inventory of markup that never rendered, and of commands that
+ * lost their block.
+ *
+ * @returns {ProseDefectItem[]}
+ */
+export function buildProseDefectInventory() {
+  const found = [];
+
+  for (const course of loadCourses()) {
+    for (const lesson of course.lessons) {
+      for (const item of lesson.content_items ?? []) {
+        const absFile = resolveContentFile(course.absPath, item.file);
+        if (!absFile) continue;
+
+        const html = fs.readFileSync(absFile, "utf8");
+        const relPath = path.relative(repoRoot, absFile);
+
+        for (const raw of findProseDefects(html, relPath)) {
+          found.push({
+            id: `${course.dir}/${lesson.slug}/${item.id}#prose${raw.ordinal}`,
+            fingerprint: fingerprint(raw.match),
+            kind: raw.kind,
+            rule: raw.rule,
+            what: raw.what,
+            match: raw.match,
+            source: raw.source,
+            editorRef: `${relPath}:${raw.source.line}:${raw.source.column}`,
+            url: lessonUrl(course, lesson),
+          });
+        }
+      }
+    }
+  }
+
+  return found;
+}
+
+let cachedProse = null;
+/** Memoized inventory of prose defects. */
+export function getProseDefects() {
+  cachedProse ??= buildProseDefectInventory();
+  return cachedProse;
 }
