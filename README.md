@@ -50,6 +50,7 @@ Errata makes an inventory of the content. It then runs the checks against that i
 | Area | Examples of what errata finds |
 |---|---|
 | Code blocks | A `<pre>` with no `data-lang`. A `<pre>` with no `<code>` child. |
+| Placeholders | A value the parser ate, leaving a dangling flag or an empty string. |
 | Config blocks | JSON, YAML, Dockerfile, and Terraform blocks that do not parse. |
 | Commands and output | Output that contradicts the command above it. |
 | Metadata | A path in `lessons-meta.json` that matches no file. |
