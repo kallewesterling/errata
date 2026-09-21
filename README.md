@@ -53,6 +53,7 @@ Errata makes an inventory of the content. It then runs the checks against that i
 | Config blocks | JSON, YAML, Dockerfile, and Terraform blocks that do not parse. |
 | Commands and output | Output that contradicts the command above it. |
 | Metadata | A path in `lessons-meta.json` that matches no file. |
+| Page scripts | An HTML entity inside a `<script>`, which never decodes. |
 | Container images | An image that does not resolve. An image that needs a login. |
 | Links | A dead link. A moved link. A `#anchor` that no longer exists. |
 | Images | An `<img src>` that does not load. |
