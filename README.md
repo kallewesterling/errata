@@ -49,11 +49,13 @@ Errata makes an inventory of the content. It then runs the checks against that i
 
 | Area | Examples of what errata finds |
 |---|---|
-| Code blocks | A `<pre>` with no `data-lang`. A `<pre>` with no `<code>` child. |
+| Code blocks | A `<pre>` with no `data-lang`. A `<pre>` with no `<code>` child. An HTML comment the browser drops. |
 | Placeholders | A value the parser ate, leaving a dangling flag or an empty string. |
 | Config blocks | JSON, YAML, Dockerfile, and Terraform blocks that do not parse. |
 | Commands and output | Output that contradicts the command above it. An output line wearing a `$` prompt. |
-| Metadata | A path in `lessons-meta.json` that matches no file. |
+| Metadata | A path in `lessons-meta.json` that matches no file. A `data-lang` nothing uses. |
+| Pasted code | A curly quote or non-breaking space that breaks in a shell. |
+| Prose | Markdown that never rendered. A command flattened into a sentence. |
 | Page scripts | An HTML entity inside a `<script>`, which never decodes. |
 | Container images | An image that does not resolve. An image that needs a login. |
 | Links | A dead link. A moved link. A `#anchor` that no longer exists. |
