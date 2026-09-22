@@ -31,7 +31,7 @@ import {
 import { CATEGORIES } from "./categories.js";
 import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
 import { SIBLING_PROBLEM_IDS } from "./siblings.js";
-import { indexIssues, loadKnownIssues } from "./known-issues.js";
+import { indexIssues, loadKnownIssues, partitionUnmatched } from "./known-issues.js";
 import { LINK_PROBLEM_IDS } from "./link-health.js";
 import { blockItem, blockLocation, style } from "./report.js";
 import { htmlCommentIn, opensAsDockerfile, typographyIn } from "./markup.js";
@@ -654,15 +654,23 @@ export function applyKnownIssues(problems) {
   // entry naming a check that exists but did not run belongs to another tier
   // and is nobody's business right now; one naming no check at all is a typo.
   const ranHere = new Set(problems.map((p) => p.id));
-  const resolved = issues.filter(
+  const unmatched = issues.filter(
     (issue) =>
       ranHere.has(issue.problem) && !matched.has(`${issue.problem}\u0000${issue.key}`),
   );
+
+  // An entry matching nothing is either a repair or a retitled lesson, and
+  // the advice for the two is opposite. Separating them is the difference
+  // between protecting a recorded decision and telling somebody to bin it.
+  const stillOpen = problems.flatMap((problem) =>
+    problem.items.map((item) => ({ problem: problem.id, key: item.key })),
+  );
+  const { renamed, resolved } = partitionUnmatched(unmatched, stillOpen);
   const unknown = issues.filter(
     (issue) => !ranHere.has(issue.problem) && !OTHER_TIER_PROBLEM_IDS.has(issue.problem),
   );
 
-  return { problems, stale, resolved, unknown, notes };
+  return { problems, stale, renamed, resolved, unknown, notes };
 }
 
 /**

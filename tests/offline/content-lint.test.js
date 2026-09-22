@@ -7,7 +7,7 @@ import { style } from "../../src/report.js";
 import { expectNone } from "../helpers.js";
 
 const blocks = getInventory();
-const { problems, stale, resolved, unknown } = inspect(blocks);
+const { problems, stale, renamed, resolved, unknown } = inspect(blocks);
 
 /**
  * The content checks are driven by the shared catalogue in src/problems.js, so
@@ -56,6 +56,29 @@ describe("the known-issues file matches what is actually there", () => {
           ["now", String(item.fingerprint)],
         ],
         locations: item.locations,
+      })),
+    });
+  });
+
+  it("has no entries whose lesson has since been retitled", () => {
+    expectNone(renamed.length, {
+      title: "known issues naming a lesson slug that has changed",
+      why:
+        "The slug is derived from the lesson title, so retitling a lesson " +
+        "silently detaches every acceptance against it. The finding is still " +
+        "there and is now reported as open and unexplained, while the entry " +
+        "is left naming an instance under a name nothing has any more. " +
+        "Deleting the entry would throw away a decision that still holds.",
+      fix:
+        "Update the key to the one shown here. The decision, the reason and " +
+        "the date all stand; only the name of the thing it points at moved.",
+      items: renamed.map(({ issue, key, from, to }) => ({
+        summary: `${style.heading(issue.problem)}  ${style.muted(issue.key)}`,
+        details: [
+          ["was", from],
+          ["now", to],
+          ["new key", key],
+        ],
       })),
     });
   });

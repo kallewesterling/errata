@@ -57,7 +57,7 @@ if (args.includes("--json")) {
  * holding, together with the note explaining why.
  */
 if (args.includes("--problems")) {
-  const { problems, stale, resolved, unknown, notes } = inspect(blocks);
+  const { problems, stale, renamed, resolved, unknown, notes } = inspect(blocks);
 
   // --category narrows the report to one kind of work. A markup pass, a look
   // at the world outside the repository, and a lesson nobody has drafted are
@@ -107,6 +107,10 @@ if (args.includes("--problems")) {
 
   for (const { label, entries } of [
     { label: "recorded against content that has since changed", entries: stale.map((s) => s.issue) },
+    {
+      label: "naming a lesson slug that has changed; re-key, do not delete",
+      entries: renamed.map(({ issue, key }) => ({ ...issue, key: `${issue.key}  ->  ${key}` })),
+    },
     { label: "no longer matching any finding", entries: resolved },
     { label: "naming a check that does not exist", entries: unknown },
   ]) {
@@ -156,7 +160,8 @@ if (args.includes("--problems")) {
       "Registry and link checks need the network; run `npm run test:network`.",
     ),
   );
-  const bad = failing.length + stale.length + resolved.length + unknown.length;
+  const bad =
+    failing.length + stale.length + renamed.length + resolved.length + unknown.length;
   process.exit(bad > 0 ? 1 : 0);
 }
 
