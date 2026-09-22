@@ -51,6 +51,10 @@ staleImageDays: 365
 # A fixture that must come out clean therefore cannot carry a full taxonomy.
 languages:
   console: { kind: shell }
+  # Used by the shebang block in the adjudications lesson: a file the reader
+  # saves is not a session they type, and it is tagged apart from console so
+  # that the missing prompt is correct rather than tolerated.
+  bash: { kind: shell }
   ansi: { kind: output }
   json: { kind: config, parser: json }
   yaml: { kind: config, parser: yaml }
