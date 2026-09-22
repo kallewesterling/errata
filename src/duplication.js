@@ -325,6 +325,7 @@ export function collectDuplicationProblems(pairs, blockGroups = []) {
   return [
     {
       id: "drifted-copy",
+      category: /** @type {const} */ ("stale"),
       severity: "warning",
       title: "lessons that are copies of each other but no longer match",
       why:
@@ -342,6 +343,7 @@ export function collectDuplicationProblems(pairs, blockGroups = []) {
     },
     {
       id: "shared-code-block",
+      category: /** @type {const} */ ("stale"),
       severity: "warning",
       title: "code blocks that appear in more than one course",
       why:
