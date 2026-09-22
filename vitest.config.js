@@ -42,6 +42,20 @@ export default defineConfig({
         },
       },
       {
+        // The deliberately-broken fixture, which proves a check reaches a
+        // report rather than only that its detector works. Its own project
+        // because the content a run checks is chosen by an environment
+        // variable read once, and the rest of the suite needs the clean one.
+        test: {
+          name: "fixture",
+          include: ["tests/fixture/**/*.test.js"],
+          testTimeout: 60_000,
+          env: {
+            ERRATA_CONFIG: path.join(here, "tests", "fixtures", "dirty", "errata.yaml"),
+          },
+        },
+      },
+      {
         test: {
           name: "network",
           include: ["tests/network/**/*.test.js"],

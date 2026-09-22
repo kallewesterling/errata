@@ -1,0 +1,4 @@
+# No findings are accepted here. The point of this fixture is that every
+# check reports, so an acceptance would hide the thing being tested.
+issues: []
+notes: []

@@ -10,8 +10,8 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "test": "vitest run --project offline",
-    "test:offline": "vitest run --project offline",
+    "test": "vitest run --project offline --project fixture",
+    "test:offline": "vitest run --project offline --project fixture",
     "test:network": "vitest run --project network",
     "test:all": "vitest run",
     "inventory": "node scripts/inventory.js",
