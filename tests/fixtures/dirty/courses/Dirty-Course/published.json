@@ -1,0 +1,10 @@
+{
+  "course_id": "dirtycourse01",
+  "domains": {
+    "courses.example.com": {
+      "slug": "dirty-course",
+      "published_course_id": "dirtypublished1",
+      "hidden": false
+    }
+  }
+}

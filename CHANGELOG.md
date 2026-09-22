@@ -38,6 +38,24 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- A second test fixture, `tests/fixtures/dirty/`, broken on purpose and
+  carrying one instance of each finding, with `tests/fixture/dirty.test.js`
+  asserting the exact set. It runs as its own vitest project, because the
+  content a run checks is chosen by an environment variable read once and the
+  rest of the suite needs the clean fixture.
+
+  It closes a gap the unit tests cannot: between a detector and a reported
+  finding sit the inventory walk, the identity it builds, the fingerprint, the
+  editorRef, the lesson URL and the catalogue entry. A check wired to the
+  wrong inventory, or building a key that collides, or never reaching
+  `collectProblems` at all, passed every test in the suite until now.
+  Unwiring one on purpose fails two of the new tests.
+
+  Eleven checks are covered. The test also asserts nothing fires *beyond* what
+  was planted, so a block tripping a second check by accident is a failure
+  rather than a quiet pass, and asserts that every instance of a check has a
+  distinct key, a fingerprint, a file-and-line, and a lesson URL.
+
 - Cross-copy reporting (`src/siblings.js`). Courses here are assembled from
   shared lessons and nothing in the repository links the copies, so a repair
   lands in whichever copy the author had open and the other keeps the defect.
