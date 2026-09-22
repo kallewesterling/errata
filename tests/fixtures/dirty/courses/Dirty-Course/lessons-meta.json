@@ -1,0 +1,32 @@
+[
+  {
+    "id": "dirtylesson10",
+    "slug": "10-One-Of-Everything",
+    "title": "One of everything",
+    "order": 10,
+    "description_html": "",
+    "content_items": [
+      { "id": "dirtyitem10a", "file": "lessons/10-One-Of-Everything/content-dirtyitem10a.html", "order": 1 }
+    ]
+  },
+  {
+    "id": "dirtylesson20",
+    "slug": "20-A-Second-Lesson",
+    "title": "A second lesson",
+    "order": 20,
+    "description_html": "",
+    "content_items": [
+      { "id": "dirtyitem20a", "file": "lessons/20-A-Second-Lesson/content-dirtyitem20a.html", "order": 1 }
+    ]
+  },
+  {
+    "id": "dirtylesson30",
+    "slug": "30-Unwritten-Lesson",
+    "title": "Unwritten lesson",
+    "order": 30,
+    "description_html": "",
+    "content_items": [
+      { "id": "dirtyitem30a", "file": "lessons/30-Unwritten-Lesson/content-dirtyitem30a.html", "order": 1 }
+    ]
+  }
+]
