@@ -26,5 +26,19 @@
         "order": 1
       }
     ]
+  },
+  {
+    "id": "fixturelesson30",
+    "slug": "30-Cases-That-Are-Not-Findings",
+    "title": "Cases that are not findings",
+    "order": 30,
+    "description_html": "",
+    "content_items": [
+      {
+        "id": "fixtureitem30a",
+        "file": "lessons/30-Cases-That-Are-Not-Findings/content-fixtureitem30a.html",
+        "order": 1
+      }
+    ]
   }
 ]

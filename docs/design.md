@@ -288,17 +288,35 @@ For the courses this was built against, that record is `docs/errata-findings.md`
 in the content repository. To produce your own, run `npm run inventory --
 --problems --all`, `npm run check:links` and `npm run check:copies`.
 
-Two results are worth keeping here, because they changed errata itself rather
-than the content:
+Six results are worth keeping here, because they changed errata itself rather
+than the content. Each is a case that looks like a defect to a rule that has
+not been told otherwise, and each was settled once against real content:
 
 - **A container prompt is a prompt.** Blocks that use `nginx:/#` show exactly
   what a reader sees after attaching to a container. Reporting those as
   promptless would have made the content worse to fix than to leave.
 - **The `#` character opens a comment, not a root shell.** Reading `# Install
   (macOS)` as a root prompt invented commands that no reader is meant to run.
+- **A script is not a transcript.** A block opening with `#!/usr/bin/env bash`
+  is a file the reader saves, so the absence of a prompt is correct rather
+  than missing.
+- **A bare `#` alone in a block is a prompt on display.** The lesson is showing
+  what the terminal looks like, not giving the reader something to type.
+- **Both output conventions are legal.** Output can sit in its own `ansi`
+  block or stay inside the `console` block with the prompt telling the two
+  apart. Neither is an error, and the content uses both.
+- **Backticks inside a `<pre>` are not stray markup.** There they are command
+  substitution, ASCII art, or output captured from a tool that printed them.
+  Only backticks outside a `<pre>` are a Markdown leftover.
 
 Two thirds of the first "promptless shell block" findings were faults in errata,
 not in the content. Only real content shows that.
+
+These are documentary until something executes them, so the fixture carries a
+lesson holding one block per case, and `tests/offline/adjudications.test.js`
+asserts both that each rule stays quiet on the block it would have reported
+and that the catalogue as a whole reports nothing from that lesson. The second
+assertion is the one that catches a rule nobody thought to exempt.
 
 
 ## Why errata replaces the check:links script in Syncjar
