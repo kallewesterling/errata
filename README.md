@@ -170,7 +170,10 @@ Errata reports three states. All three fail:
 |---|---|---|
 | open | No entry covers this finding. | Fix the content, or add an entry. |
 | stale | The block changed after you wrote the entry. | Read the finding again. Update or delete the entry. |
+| renamed | The lesson was retitled, so the entry's key no longer points at it. | Update the key. Errata prints the new one. |
 | resolved | The entry covers no finding. | Delete the entry. |
+
+Keep `renamed` and `resolved` apart when you act on them. Retitling a lesson changes its slug, which silently detaches every entry against it, and deleting those entries throws away decisions that still hold.
 
 The file also has a `notes` section. Use it for an observation that no check looks for. A note suppresses nothing and fails nothing. It survives for the next person who edits the lesson.
 

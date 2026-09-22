@@ -286,6 +286,16 @@ The fingerprint keeps the file current. An entry stores the hash of the block th
 
 A finding about the existence of a file has no fingerprint, because there is no content to hash.
 
+### A retitled lesson is not a repaired one
+
+An entry that matches no finding means one of two things, and they call for opposite actions. Either the finding was repaired and the entry should go, or the lesson was retitled, its slug moved, and the entry now names an instance under a name nothing has any more — while the finding itself is still there and newly unexplained.
+
+Reporting both as "resolved, delete these" is worse than saying nothing, because acting on it destroys a recorded decision. The finding then reappears as open, and for an adjudicated case the next person "fixes" something that was deliberately left alone. That nearly happened: two acceptances in the courses content were detached at once when two lesson titles took the colon form, and the advice errata gave was to delete both.
+
+The two are separable because only the slug moves. A key is `course/lesson-slug/content-item#ordinal`, the content item id is opaque and unique, so an unmatched entry whose course, item and ordinal all equal those of an open finding of the same check is a rename. Errata reports it as one, prints the new key, and asks for a re-key rather than a deletion. The decision, the reason and the date all stand; only the name of the thing it points at moved.
+
+Keys that are not lesson-shaped — a language name, a bare path, a pair of lesson ids — do not participate, so a rename is never invented for them.
+
 ### Why .errata.yaml lives with the content, and why it is a dotfile
 
 The content repository syncs with Skilljar in both directions. A daily CI job pulls Skilljar into git. Anything inside the lesson HTML must therefore survive a round trip through a rich-text editor. That editor can drop an HTML comment without a warning.

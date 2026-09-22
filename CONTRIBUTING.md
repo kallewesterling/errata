@@ -23,6 +23,32 @@ Run `npm run typecheck` **after** writing tests, not before. The tests are
 type-checked too, and a hand-built fixture object that does not satisfy a
 typedef is the most common way to get a clean local run and a red CI one.
 
+### Run it against real content, and read the output
+
+The fixtures prove the tool behaves. Only real content tells you whether it
+behaves *usefully*, and that is a different question. The fixtures are written
+by whoever wrote the check, so they encode the same assumptions the check does.
+
+This is not a nicety. Most of the improvements to errata came from pointing it
+at a real checkout and reading what it said, rather than from the test suite:
+
+- A rule for a full stop with nothing before it was dropped for reporting 51
+  sites of which 2 were real — then restored, because the 49 were all
+  commands and the 2 were all output, and scoping it to output lines made it
+  exact. The measurement said "bad rule"; reading the output said "right rule,
+  wrong population".
+- The `user-content-` anchor false positive was 7 of 13 findings in one run,
+  and every one of them looked like a correct finding until the pages were
+  opened.
+- Reporting a retitled lesson as a resolved one, and advising deletion, was
+  found by following that advice and noticing it contradicted a note in the
+  same file.
+
+None of those would have surfaced from a fixture. When a check is new, run it
+against a real checkout, read every finding it produces, and open the ones you
+believe as well as the ones you doubt. A check that is right for the wrong
+reason is worse than one that is wrong, because nothing will catch it later.
+
 ## Adding a check
 
 A check earns its place by being measured, not by being reasonable. Every rule
