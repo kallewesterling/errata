@@ -30,6 +30,7 @@ import {
 } from "./integrity.js";
 import { CATEGORIES } from "./categories.js";
 import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
+import { SIBLING_PROBLEM_IDS } from "./siblings.js";
 import { indexIssues, loadKnownIssues } from "./known-issues.js";
 import { LINK_PROBLEM_IDS } from "./link-health.js";
 import { blockItem, blockLocation, style } from "./report.js";
@@ -603,6 +604,7 @@ export function collectProblems(blocks = getInventory()) {
 const OTHER_TIER_PROBLEM_IDS = new Set([
   ...LINK_PROBLEM_IDS,
   ...DUPLICATION_PROBLEM_IDS,
+  ...SIBLING_PROBLEM_IDS,
 ]);
 
 /**

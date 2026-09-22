@@ -60,7 +60,7 @@ Errata makes an inventory of the content. It then runs the checks against that i
 | Container images | An image that does not resolve. An image that needs a login. |
 | Links | A dead link. A moved link. A `#anchor` that no longer exists. |
 | Images | An `<img src>` that does not load. |
-| Copies | Two lessons that were identical, and now differ. |
+| Copies | Two lessons that were identical, and now differ. A finding in one copy but not its twin. |
 | Unwritten | A lesson body that is still a placeholder. A description still reading `{Short description}`. |
 
 For the reasons behind these checks, read [docs/design.md](docs/design.md).
