@@ -188,6 +188,32 @@ Two details are important:
 - **Errata excludes `<script>` elements.** 557 of the 745 content files carry a related-resources widget inside a `<script>` element, and the widget names sibling courses. It differs in every copy by design. If errata keeps it, it dominates every comparison that includes it.
 - **Block boundaries survive normalization.** A command with no full stop after it must not run into the sentence that follows it. Without this rule, a changed command and a rewritten paragraph arrive as one unit.
 
+### A finding in one copy is a question about the other
+
+Nothing in the repository links the copies: no shared id, no include, no marker in the files. So a repair lands in whichever copy the author had open, and the other keeps the defect. That is invisible from inside either file, and invisible to every check that reads one file at a time.
+
+The copy census already knows which lessons are near-duplicates. Crossing it with the findings turns every existing check into a cross-copy check, and no check has to know that copies exist. Three questions fall out, and they call for different actions:
+
+| Finding | What it means |
+|---|---|
+| present in one copy, not its twin | a repair reached one side only, or the copies are diverging |
+| present in both | one repair is two edits, and forgetting the second is how this arises |
+| accepted in one, open in its twin | the acceptance is half-applied, and its reason is in a file the next reader has no cause to open |
+
+On the content this was built against, that is 5, 11 and 0. One of the five is the case that prompted the check: a prompt-shaped defect repaired in `Chainguard-Containers-Crash-Course/40` and never touched in `Containers-Containers-Containers/60`.
+
+The crossing lives with the copy census rather than in the offline lint, because computing the pairs is the expensive half of that work and the lint runs on every change.
+
+### Drift is reported by what changed, not just that it changed
+
+Of the drifted pairs in this content, 2 differ in something a reader runs and 21 differ only in wording. Reported together, the two that matter are buried under twenty-one that are usually correct, since a lesson written to stand alone legitimately opens differently from the same lesson inside a path.
+
+So they are separate findings. `drifted-copy-code` is the one to read first.
+
+The widget differences an earlier audit saw are already absent here. `visibleText` excludes `<script>`, so the related-resources widget never enters the comparison, and errata's drift count is of prose and code only.
+
+Two censuses of this content disagree, and the disagreement is worth recording rather than resolving. Errata counts 29 identical pairs and 23 drifted; a hand-written pass using Jaccard over token sets counted 29 and 25. The identical count agrees exactly. The drifted count cannot, because token sets ignore word order and repetition, so more pairs clear the same threshold — reproducing that method here gives 30. Neither is wrong; they are different questions, and the one errata asks is the stricter.
+
 ### Drift never fails a run
 
 A lesson that stands alone opens differently from the same lesson inside a learning path. One says "in this course" where the other says "in this module". That difference is correct, and a machine cannot tell it apart from a repair that landed on one side only.

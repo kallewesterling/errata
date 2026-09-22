@@ -38,6 +38,37 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- Cross-copy reporting (`src/siblings.js`). Courses here are assembled from
+  shared lessons and nothing in the repository links the copies, so a repair
+  lands in whichever copy the author had open and the other keeps the defect.
+  Crossing the copy census with the findings turns every existing check into a
+  cross-copy check, without any check having to know that copies exist.
+
+  - `uneven-copy` — a finding in one lesson and not its near-duplicate twin.
+    Five against the content, one of which is the case that prompted the
+    request: a prompt-shaped defect repaired in
+    `Chainguard-Containers-Crash-Course/40` and never touched in
+    `Containers-Containers-Containers/60`.
+  - `shared-finding` — the same finding in both copies, so one repair is two
+    edits. Eleven, reported once per pair rather than once per copy.
+  - `half-accepted-copy` — accepted in one copy and still open in its twin,
+    which leaves the second reported with its explanation in a file the next
+    reader has no reason to open.
+
+  It runs with `npm run check:copies` rather than in the offline lint, because
+  computing the pairs is the expensive half of that work and the lint runs on
+  every change.
+
+- Drift is now reported by what changed. `drifted-copy` becomes
+  `drifted-copy-code` and `drifted-copy-prose`, because 2 of the 23 drifted
+  pairs differ in something a reader runs and 21 differ only in wording — and
+  a lesson written to stand alone legitimately opens differently from the same
+  lesson inside a path. Reported together, the two that matter were buried
+  under twenty-one that are usually correct.
+
+  Any `.errata.yaml` entry naming `drifted-copy` needs renaming to whichever
+  of the two now applies. Nothing in the courses content accepted one.
+
 - Every finding now declares a **category** — `defect`, `stale` or
   `unwritten` — saying what kind of work it needs (`src/categories.js`).
   `npm run inventory -- --problems --category defect` asks the question that

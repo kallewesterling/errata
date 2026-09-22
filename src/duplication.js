@@ -283,7 +283,8 @@ export function sharedGroups(items, valueOf, ownerOf) {
 
 /** Every finding this module can emit, for validating known-issues entries. */
 export const DUPLICATION_PROBLEM_IDS = Object.freeze([
-  "drifted-copy",
+  "drifted-copy-code",
+  "drifted-copy-prose",
   "shared-code-block",
 ]);
 
@@ -322,23 +323,46 @@ export function collectDuplicationProblems(pairs, blockGroups = []) {
     };
   };
 
+  // Split by what actually changed. Of the drifted pairs in the content this
+  // was built against, all but one or two differ only in wording, and a
+  // lesson written to stand alone legitimately opens differently from the
+  // same lesson inside a path. Reported together, the handful that differ in
+  // something a reader runs are buried under the ones that are correct.
+  const differsInCode = apart.filter(touchesCode);
+  const differsInProse = apart.filter((pair) => !touchesCode(pair));
+
   return [
     {
-      id: "drifted-copy",
+      id: "drifted-copy-code",
       category: /** @type {const} */ ("stale"),
       severity: "warning",
-      title: "lessons that are copies of each other but no longer match",
+      title: "copies of a lesson that differ in something a reader runs",
       why:
-        "Courses here are assembled from shared lessons, so a copy is normal " +
-        "and a copy that stopped matching its twin is not. It usually means an " +
-        "edit reached one of them and missed the other, which is invisible " +
-        "from inside either file.",
+        "Two copies with different wording are usually fine. Two copies with " +
+        "different commands are the least likely to differ on purpose and " +
+        "the most expensive for a reader to meet, because one of the two is " +
+        "telling somebody to run the wrong thing.",
       fix:
-        "Read the differing sentences. Some are deliberate, because a lesson " +
-        "written to stand alone opens differently from the same lesson inside " +
-        "a path. If a difference is not deliberate, apply it to both, then " +
-        "record the pair in the known-issues file if it should stay apart.",
-      items: apart.map(item),
+        "Read the differing lines and decide which command is right, then " +
+        "apply it to both copies in the same change.",
+      items: differsInCode.map(item),
+      accepted: [],
+    },
+    {
+      id: "drifted-copy-prose",
+      category: /** @type {const} */ ("stale"),
+      severity: "warning",
+      title: "copies of a lesson whose wording has come apart",
+      why:
+        "An edit reached one copy and missed the other, or the two were " +
+        "deliberately written differently. A machine cannot tell those " +
+        "apart: a lesson that stands alone says \"in this course\" where the " +
+        "same lesson inside a path says \"in this module\", and that is correct.",
+      fix:
+        "Read the differing sentences. If a difference is not deliberate, " +
+        "apply it to both. If it is, record the pair in the known-issues " +
+        "file so it stops being asked about.",
+      items: differsInProse.map(item),
       accepted: [],
     },
     {
