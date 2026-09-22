@@ -61,8 +61,26 @@ Errata makes an inventory of the content. It then runs the checks against that i
 | Links | A dead link. A moved link. A `#anchor` that no longer exists. |
 | Images | An `<img src>` that does not load. |
 | Copies | Two lessons that were identical, and now differ. |
+| Unwritten | A lesson body that is still a placeholder. A description still reading `{Short description}`. |
 
 For the reasons behind these checks, read [docs/design.md](docs/design.md).
+
+### Every finding says what kind of work it needs
+
+| Category | Meaning | Who fixes it |
+|---|---|---|
+| `defect` | Wrong now, and fixable from evidence already in the repository. | Whoever is doing a markup pass. |
+| `stale` | Was right when written and has aged out. The evidence is outside the repository. | Somebody who can go and look. |
+| `unwritten` | Never finished: a placeholder, a template value, a note where prose was meant to go. | The author who owns the course. |
+
+Ask for one kind at a time:
+
+```bash
+npm run inventory -- --problems --category defect     # Everything fixable from the repository.
+npm run inventory -- --problems --category unwritten  # Everything that needs an author.
+```
+
+This is a different question from severity. Severity says how loudly to report something; the category says who fixes it and with what. A stale link can be worth failing a run over, and a defect can be worth only a note.
 
 ## Configure errata
 

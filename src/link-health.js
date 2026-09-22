@@ -230,6 +230,7 @@ export function collectLinkProblems(verdicts, links) {
   return [
     {
       id: "dead-link",
+      category: /** @type {const} */ ("defect"),
       title: "links in prose that are gone",
       why:
         "The lesson tells a reader to follow this link and the server says " +
@@ -244,6 +245,7 @@ export function collectLinkProblems(verdicts, links) {
     },
     {
       id: "dead-image",
+      category: /** @type {const} */ ("defect"),
       title: "images that do not load",
       why:
         "An image is not a promise a reader can choose not to follow; it is " +
@@ -265,6 +267,7 @@ export function collectLinkProblems(verdicts, links) {
     },
     {
       id: "moved-link",
+      category: /** @type {const} */ ("stale"),
       title: "links to pages that have permanently moved",
       why:
         "Each of these answers with a 301, so nothing looks broken today, but " +
@@ -281,6 +284,7 @@ export function collectLinkProblems(verdicts, links) {
     },
     {
       id: "moved-link-review",
+      category: /** @type {const} */ ("stale"),
       severity: "warning",
       title: "redirects that need a person to judge them",
       why:
@@ -302,6 +306,7 @@ export function collectLinkProblems(verdicts, links) {
     },
     {
       id: "missing-fragment",
+      category: /** @type {const} */ ("defect"),
       title: "links to a heading that no longer exists",
       why:
         "The page loads, so every status-code check passes, but the #anchor " +
@@ -317,6 +322,7 @@ export function collectLinkProblems(verdicts, links) {
     },
     {
       id: "temporary-redirect",
+      category: /** @type {const} */ ("stale"),
       severity: "warning",
       title: "links answered by a temporary redirect",
       why:
@@ -335,6 +341,7 @@ export function collectLinkProblems(verdicts, links) {
     },
     {
       id: "unreachable-link",
+      category: /** @type {const} */ ("stale"),
       severity: "warning",
       title: "links that could not be checked",
       why:

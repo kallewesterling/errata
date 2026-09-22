@@ -11,6 +11,7 @@ import { linkBlocks } from "./pairing.js";
 import { findProseDefects } from "./prose-defects.js";
 import { extractImages, extractLinks } from "./prose-links.js";
 import { extractScriptEntities } from "./scripts.js";
+import { findTemplateValues, findUnwritten } from "./unwritten.js";
 import { collectWarnings } from "./warnings.js";
 
 /**
@@ -434,4 +435,87 @@ let cachedProse = null;
 export function getProseDefects() {
   cachedProse ??= buildProseDefectInventory();
   return cachedProse;
+}
+
+/**
+ * @typedef {object} UnwrittenItem
+ * @property {string} id
+ * @property {string} fingerprint
+ * @property {string} rule
+ * @property {string} what
+ * @property {string} match
+ * @property {string} editorRef
+ * @property {string|null} url
+ */
+
+/**
+ * Build the inventory of content nobody has written yet.
+ *
+ * Covers both lesson bodies and the course metadata beside them, because a
+ * course whose description is still `{Short description}` is unfinished in
+ * exactly the same way as a lesson whose body is still `Placeholder`.
+ *
+ * @returns {UnwrittenItem[]}
+ */
+export function buildUnwrittenInventory() {
+  const found = [];
+
+  for (const course of loadCourses()) {
+    for (const metaFile of ["details.json", "published.json"]) {
+      const absFile = path.join(course.absPath, metaFile);
+      if (!fs.existsSync(absFile)) continue;
+
+      const relPath = path.relative(repoRoot, absFile);
+      let parsed;
+      try {
+        parsed = JSON.parse(fs.readFileSync(absFile, "utf8"));
+      } catch {
+        // Malformed metadata is somebody else's finding, not this one's.
+        continue;
+      }
+
+      for (const template of findTemplateValues(parsed)) {
+        found.push({
+          id: `${course.dir}/${metaFile}#${template.path}`,
+          fingerprint: fingerprint(template.value),
+          rule: "template-value",
+          what: "a metadata value that is still its own template",
+          match: `${template.path}: ${template.value}`,
+          editorRef: `${relPath}:1:1`,
+          url: null,
+        });
+      }
+    }
+
+    for (const lesson of course.lessons) {
+      for (const item of lesson.content_items ?? []) {
+        const absFile = resolveContentFile(course.absPath, item.file);
+        if (!absFile) continue;
+
+        const html = fs.readFileSync(absFile, "utf8");
+        const relPath = path.relative(repoRoot, absFile);
+
+        for (const raw of findUnwritten(html, visibleText(html))) {
+          found.push({
+            id: `${course.dir}/${lesson.slug}/${item.id}#unwritten${raw.ordinal}`,
+            fingerprint: fingerprint(raw.match),
+            rule: raw.rule,
+            what: raw.what,
+            match: raw.match,
+            editorRef: `${relPath}:1:1`,
+            url: lessonUrl(course, lesson),
+          });
+        }
+      }
+    }
+  }
+
+  return found;
+}
+
+let cachedUnwritten = null;
+/** Memoized inventory of unfinished content. */
+export function getUnwritten() {
+  cachedUnwritten ??= buildUnwrittenInventory();
+  return cachedUnwritten;
 }
