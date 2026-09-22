@@ -42,13 +42,25 @@ export default defineConfig({
         },
       },
       {
-        // The deliberately-broken fixture, which proves a check reaches a
-        // report rather than only that its detector works. Its own project
-        // because the content a run checks is chosen by an environment
-        // variable read once, and the rest of the suite needs the clean one.
+        // Tests pinned to a fixture rather than to whatever content the run
+        // is pointed at. They are about errata's own behaviour, so they need
+        // known content, and they each pin their own ERRATA_CONFIG rather
+        // than inheriting one. Without that, running the suite against a real
+        // checkout — which CONTRIBUTING tells you to do — fails them for
+        // reasons that have nothing to do with the change under review.
         test: {
-          name: "fixture",
-          include: ["tests/fixture/**/*.test.js"],
+          name: "pinned-clean",
+          include: ["tests/pinned/clean/**/*.test.js"],
+          testTimeout: 60_000,
+          env: {
+            ERRATA_CONFIG: path.join(here, "tests", "fixtures", "content", "errata.yaml"),
+          },
+        },
+      },
+      {
+        test: {
+          name: "pinned-dirty",
+          include: ["tests/pinned/dirty/**/*.test.js"],
           testTimeout: 60_000,
           env: {
             ERRATA_CONFIG: path.join(here, "tests", "fixtures", "dirty", "errata.yaml"),

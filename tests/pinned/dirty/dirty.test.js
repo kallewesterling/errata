@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { collectProblems } from "../../src/problems.js";
-import { getInventory } from "../../src/inventory.js";
+import { collectProblems } from "../../../src/problems.js";
+import { getInventory } from "../../../src/inventory.js";
 
 /**
  * End-to-end coverage: a check reaches a report, not just a string.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getInventory } from "../../src/inventory.js";
-import { collectProblems } from "../../src/problems.js";
+import { getInventory } from "../../../src/inventory.js";
+import { collectProblems } from "../../../src/problems.js";
 
 /**
  * Cases that were settled once and must not come back as findings.

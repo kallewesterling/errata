@@ -38,6 +38,18 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- Fixed: tests that assert against a fixture no longer fail when the suite is
+  pointed at real content. The adjudications tests named a lesson that only
+  exists in the clean fixture, so `npm test` against a real checkout — which
+  `CONTRIBUTING.md` tells you to do — produced six failures that had nothing
+  to do with the change under review. Six spurious failures beside two real
+  ones is the fastest way to teach somebody to ignore a red suite.
+
+  Both fixture-shaped suites now live under `tests/pinned/` and each project
+  pins its own `ERRATA_CONFIG`: `pinned-clean` against the clean fixture,
+  `pinned-dirty` against the broken one. Against a real checkout the suite now
+  reports only genuine content findings.
+
 - A second test fixture, `tests/fixtures/dirty/`, broken on purpose and
   carrying one instance of each finding, with `tests/fixture/dirty.test.js`
   asserting the exact set. It runs as its own vitest project, because the

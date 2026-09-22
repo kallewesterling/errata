@@ -60,14 +60,33 @@ because the fixture asserts silence, and `tests/offline/adjudications.test.js`
 names each one.
 
 `tests/fixtures/dirty/` is **broken on purpose**, one instance of each finding,
-and `tests/fixture/dirty.test.js` asserts the exact set. It is its own vitest
-project, because the content a run checks is chosen by an environment variable
-read once and the rest of the suite needs the clean one.
+and `tests/pinned/dirty/dirty.test.js` asserts the exact set.
 
 Adding a check means adding to both:
 
 - a defect in the dirty fixture, and a line in that test's `PLANTED` table
 - if the check has an adjudicated exception, a block in the clean fixture
+
+## Some tests are pinned to a fixture
+
+Tests under `tests/pinned/` are about errata's own behaviour, so they need
+known content and each project pins its own `ERRATA_CONFIG`:
+
+| project | content | asserts |
+|---|---|---|
+| `offline` | whatever the run is pointed at | the detectors, and that the content is clean |
+| `pinned-clean` | `tests/fixtures/content/` | the adjudicated cases stay silent |
+| `pinned-dirty` | `tests/fixtures/dirty/` | each check reaches a report |
+
+The pinning is not tidiness. Running the suite against a real checkout is
+something this file tells you to do, and a fixture-shaped test that inherits
+the run's content fails there for reasons that have nothing to do with your
+change. That happened: the adjudications tests lived in `offline/` for two
+days and produced six spurious failures against real content, which is the
+fastest way to teach somebody to ignore a red suite.
+
+If a test names a lesson, a block or a count, it belongs under
+`tests/pinned/`. If it would hold for any content, it belongs in `offline/`.
 
 Also test the detector directly, on an HTML string in the test file. Most
 checks here are a pure function over text, and a test that states its input
