@@ -12,9 +12,10 @@
 # content tree. What CI cannot tell you is whether the real content is clean.
 # Run `npm test` against a real checkout for that.
 #
-# `npm run test:offline` also runs the `fixture` project, which points itself
-# at `tests/fixtures/dirty/` and ignores the variable set below. That one is
-# broken on purpose and asserts each check reaches a report.
+# `npm run test:offline` also runs the two pinned projects, which point
+# themselves at a fixture and ignore the variable set below: `pinned-clean`
+# asserts the adjudicated cases stay silent, and `pinned-dirty` runs against
+# content broken on purpose and asserts each check reaches a report.
 #
 # The network tier is deliberately absent. It resolves container images and
 # fetches links from real registries and websites, so it fails for reasons that
