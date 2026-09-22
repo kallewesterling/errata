@@ -44,18 +44,16 @@ staleImageDays: 365
 #   output  transcripts and sample output; never executable
 #   config  declarative files that should parse with a real parser
 #   source  program source in some other language
+#
+# Only the four the fixture lessons actually use. The `unused-lang` check
+# reports a language nobody writes in, on the grounds that a permitted but
+# unused alias is how a corpus ends up with two spellings for one language.
+# A fixture that must come out clean therefore cannot carry a full taxonomy.
 languages:
   console: { kind: shell }
-  bash: { kind: shell }
   ansi: { kind: output }
-  text: { kind: output }
   json: { kind: config, parser: json }
   yaml: { kind: config, parser: yaml }
-  dockerfile: { kind: config, parser: dockerfile }
-  terraform: { kind: config, parser: hcl }
-  go: { kind: source }
-  python: { kind: source }
-  markdown: { kind: source }
 
 # Courses permitted to reference container images that need a login. The list
 # names the fixture course so that the setting is non-empty and typed, which is

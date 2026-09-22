@@ -10,8 +10,19 @@
  * the network, so they stay in the network tier.
  */
 import path from "node:path";
-import { anomalies, configFile, contentRoot, repoRoot } from "./config.js";
-import { getInventory, getScriptEntities } from "./inventory.js";
+import {
+  anomalies,
+  configFile,
+  contentRoot,
+  knownLangs,
+  repoRoot,
+} from "./config.js";
+import {
+  getInlineCode,
+  getInventory,
+  getProseDefects,
+  getScriptEntities,
+} from "./inventory.js";
 import {
   checkContentPaths,
   findUnreferencedContentFiles,
@@ -20,6 +31,9 @@ import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
 import { indexIssues, loadKnownIssues } from "./known-issues.js";
 import { LINK_PROBLEM_IDS } from "./link-health.js";
 import { blockItem, blockLocation, style } from "./report.js";
+import { htmlCommentIn, opensAsDockerfile, typographyIn } from "./markup.js";
+import { findPromptedOutput } from "./output-prefixes.js";
+import { RESIDUE_KINDS, endsInSpace, findResidue } from "./residue.js";
 import { REMEDIATION, warningItem } from "./warnings.js";
 
 /**
@@ -81,6 +95,11 @@ const ANOMALY_HELP = {
 export function collectProblems(blocks = getInventory()) {
   const outputs = blocks.filter((b) => b.kind === "output");
   const scriptEntities = getScriptEntities();
+  const inlineCode = getInlineCode();
+  const proseDefects = getProseDefects();
+  const unusedLangs = knownLangs.filter(
+    (lang) => !blocks.some((block) => block.lang === lang),
+  );
   const { caseMismatches, missing } = checkContentPaths();
   const warnings = blocks.flatMap((b) =>
     b.warnings.map((w) => ({ ...w, fingerprint: b.fingerprint })),
@@ -237,6 +256,207 @@ export function collectProblems(blocks = getInventory()) {
           ["on disk", m.actual],
         ],
       })),
+    },
+    {
+      id: "comment-in-block",
+      title: "code blocks containing an HTML comment",
+      why:
+        "The browser drops the comment, so it is either invisible " +
+        "instructions to the reader or a note that escaped review. The lesson " +
+        "that prompted this shows a command followed by an insert-output-here " +
+        "comment, so the reader gets a command and an empty box while the " +
+        "prose below promises what they should see.",
+      fix:
+        "Put the real content in, or move the note out of the block. A note " +
+        "that has to survive belongs in the known-issues file, which travels " +
+        "with the content and does not ship to a reader's browser.",
+      items: blocks
+        .filter((block) => htmlCommentIn(block.rawCode))
+        .map((block) =>
+          blockItem(
+            block,
+            `${style.bad(htmlCommentIn(block.rawCode))}  ${style.muted(block.id)}`,
+          ),
+        ),
+    },
+    {
+      id: "code-typography",
+      title: "typographic characters inside a code block",
+      why:
+        "A code block gets pasted into a shell, so anything that survives the " +
+        "clipboard but not the shell is a defect. A non-breaking space used " +
+        "for indentation in one lesson put U+00A0 into the reader's terminal. " +
+        "These same characters are correct in prose, so a typography pass over " +
+        "the content has to skip <pre> and <code>, and this is what checks " +
+        "that it did.",
+      fix:
+        "Use the plain ASCII equivalent: ... for an ellipsis, a real space " +
+        "for indentation, straight quotes, and a hyphen for a dash.",
+      items: blocks.flatMap((block) =>
+        typographyIn(block.code).map((found) => ({
+          summary: `${style.bad(found.char)}  ${style.muted(block.id)}`,
+          key: `${block.id} ${found.char}`,
+          fingerprint: block.fingerprint,
+          details: [["character", found.what]],
+          locations: [blockLocation(block)],
+        })),
+      ),
+    },
+    {
+      id: "mislabeled-dockerfile",
+      title: "Dockerfiles labelled as something else",
+      why:
+        "The block opens with FROM, so it is a Dockerfile whatever its " +
+        "data-lang says. The label decides which parser runs and how the " +
+        "block is highlighted, so a wrong one means the content is neither " +
+        "checked nor rendered as what it is.",
+      fix: 'Change the data-lang to "dockerfile".',
+      items: blocks
+        .filter((block) => block.lang !== "dockerfile" && opensAsDockerfile(block.code))
+        .map((block) => blockItem(block, `${style.heading(block.lang)}  ${style.muted(block.id)}`)),
+    },
+    {
+      id: "unused-lang",
+      title: "languages in the taxonomy that no block uses",
+      why:
+        "An unused but permitted alias is how a corpus ends up with two " +
+        "spellings for one language, because nothing stops the next author " +
+        "picking the other one. The content had 46 dockerfile blocks and 19 " +
+        "docker blocks before it normalized them.",
+      fix:
+        `Remove the entry from the languages map in ${configFile}. Keep it ` +
+        "only if content is about to start using it, in which case the entry " +
+        "is a plan rather than a leftover.",
+      items: unusedLangs.map((lang) => ({
+        summary: style.heading(lang),
+        key: lang,
+      })),
+    },
+    {
+      id: "markdown-in-prose",
+      title: "Markdown syntax in lesson prose",
+      why:
+        "These files are HTML, so Markdown renders as itself and the reader " +
+        "sees the punctuation. Backticks are the usual case, and they read as " +
+        "a mistake precisely where the author was trying to mark up a command.",
+      fix:
+        "Use <code> for inline code. Backticks inside a <pre> are a different " +
+        "matter and are left alone: there they are command substitution, " +
+        "ASCII art, or captured output.",
+      items: proseDefects
+        .filter((defect) => defect.kind === "markdown")
+        .map((defect) => ({
+          summary: `${style.bad(defect.match)}  ${style.muted(defect.id)}`,
+          key: `${defect.id} ${defect.rule}`,
+          fingerprint: defect.fingerprint,
+          details: [["found", defect.what]],
+          locations: [blockLocation(defect)],
+        })),
+    },
+    {
+      id: "flattened-command",
+      severity: "warning",
+      title: "commands run together into prose",
+      why:
+        "A real invocation inside a paragraph has no block around it, so the " +
+        "reader has nothing to copy and the command is never checked by " +
+        "anything here. Prose that merely names a tool is ordinary; prose " +
+        "carrying a flag and its value is a block that lost its <pre>.",
+      fix:
+        "Move the command into a <pre data-lang=\"console\"> block, or wrap " +
+        "it in <code> if the sentence is describing it rather than asking the " +
+        "reader to run it.",
+      items: proseDefects
+        .filter((defect) => defect.kind === "flattened-command")
+        .map((defect) => ({
+          summary: `${style.bad(defect.match)}  ${style.muted(defect.id)}`,
+          key: defect.id,
+          fingerprint: defect.fingerprint,
+          details: [["suspected because", defect.what]],
+          locations: [blockLocation(defect)],
+        })),
+    },
+    {
+      id: "prompted-output",
+      title: "output lines wearing a command prompt",
+      why:
+        "A $ prefix means \"type this\", so a line of program output that " +
+        "picks up one invites a reader to run something that is not a " +
+        "command. The corpus says these tokens are output: each heads an " +
+        "unprompted line in other lessons and hardly ever heads a command. " +
+        "No single-file rule can see this, because a block with a prompt and " +
+        "mixed content is also the sanctioned command-plus-output convention.",
+      fix:
+        "Move the line out of the command position. Either drop the $ so it " +
+        "reads as output inside the same block, or put it in a separate ansi " +
+        "block, matching whichever convention the lesson already uses.",
+      items: findPromptedOutput(blocks).map((found) => ({
+        summary: `${style.bad(found.command)}  ${style.muted(found.block.id)}`,
+        // Keyed by command as well as block: one block can carry two, and
+        // accepting one must not quietly accept the other.
+        key: `${found.block.id} ${found.token}`,
+        fingerprint: found.block.fingerprint,
+        details: [
+          ["token", found.token],
+          [
+            "corpus",
+            `heads an output line ${found.asOutput} times, a command ${found.asCommand}`,
+          ],
+        ],
+        locations: [blockLocation(found.block)],
+      })),
+    },
+    {
+      id: "code-trailing-space",
+      title: "inline <code> elements whose text ends in a space",
+      why:
+        "There is no reason to write <code>--parent </code> unless something " +
+        "used to follow the flag. A <pre> is not a raw-text element, so a " +
+        "literal <organization> written into one is parsed as an unknown tag " +
+        "and dropped without trace, and a trailing space is what it leaves.",
+      fix:
+        "Restore the value that was there, written as escaped angle brackets " +
+        "so the parser cannot eat it again: &lt;organization&gt;. If nothing " +
+        "was lost, delete the trailing space.",
+      items: inlineCode.filter((c) => endsInSpace(c.text)).map((c) => ({
+        summary: `${style.bad(`<code>${c.text}</code>`)}  ${style.muted(c.id)}`,
+        key: c.id,
+        fingerprint: c.fingerprint,
+        locations: [blockLocation(c)],
+      })),
+    },
+    {
+      id: "placeholder-residue",
+      severity: "warning",
+      title: "blocks that look like a placeholder was eaten",
+      why:
+        "The unescaped-markup anomaly catches a literal <tag> still sitting " +
+        "in a block. This is the destructive case, where the parser already " +
+        "consumed it and only the hole is left: a dangling flag, an empty " +
+        "quoted string, a key with no value. Nothing in the file records " +
+        "that anything was lost, so it has to be inferred from the shape.",
+      fix:
+        "Compare against the lesson's own prose and any intact copy of the " +
+        "same block elsewhere, restore the value, and write it as " +
+        "&lt;organization&gt; so it survives the next parse. These are " +
+        "heuristics: if the shape is legitimate, accept it in the " +
+        "known-issues file with that as the reason.",
+      items: blocks
+        .filter((b) => RESIDUE_KINDS.has(b.kind))
+        .flatMap((block) =>
+          findResidue(block).map((found) => ({
+            summary: `${style.bad(found.match)}  ${style.muted(block.id)}`,
+            // Keyed by rule as well as block, so accepting one shape in a
+            // block does not silently accept the next one to appear in it.
+            key: `${block.id} ${found.rule}`,
+            fingerprint: block.fingerprint,
+            details: [
+              ["suspected because", found.what],
+              ["line", found.line],
+            ],
+            locations: [blockLocation(block)],
+          })),
+        ),
     },
     {
       id: "script-entity",
