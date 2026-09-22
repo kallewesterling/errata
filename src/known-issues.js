@@ -179,3 +179,72 @@ export function indexIssues(issues) {
   }
   return byIdentity;
 }
+
+/**
+ * Take a key apart into the course, the lesson slug, and everything after.
+ *
+ * Most keys are `course/lesson-slug/content-item#ordinal`, with a suffix
+ * naming the rule or the sub-finding. The course directory and the content
+ * item id are stable; the slug is derived from the lesson title and moves
+ * whenever somebody retitles a lesson.
+ *
+ * Returns null for the keys that are not of this shape — a language name, a
+ * file path, a pair of lesson ids — which simply do not participate.
+ *
+ * @param {string} key
+ */
+function keyShape(key) {
+  const match = /^([^/]+)\/([^/]+)\/(.+)$/.exec(String(key));
+  if (!match) return null;
+  return { course: match[1], slug: match[2], rest: match[3] };
+}
+
+/**
+ * Tell a retitled lesson apart from a repaired one.
+ *
+ * An entry that matches no finding means one of two things, and they call
+ * for opposite actions. Either the finding was repaired, and the entry should
+ * be deleted; or the lesson was retitled, its slug changed, and the entry now
+ * names an instance that no longer exists under that name while the finding
+ * itself is still there and newly unexplained.
+ *
+ * Reporting both as "resolved, delete these" is worse than saying nothing.
+ * Following that advice throws away a recorded decision, and the finding then
+ * reappears as open for somebody to "fix" — which for an adjudicated case
+ * means undoing a choice that was made deliberately. That has already nearly
+ * happened once.
+ *
+ * The two are separable because only the slug moves. A content item id is
+ * opaque and unique, so an unmatched entry whose course, item and ordinal all
+ * equal those of an open finding of the same check is a rename, not a repair.
+ *
+ * @param {KnownIssue[]} unmatched  Entries matching nothing.
+ * @param {{problem: string, key: string}[]} open  Findings nothing covers.
+ * @returns {{renamed: {issue: KnownIssue, key: string, from: string, to: string}[],
+ *            resolved: KnownIssue[]}}
+ */
+export function partitionUnmatched(unmatched, open) {
+  const renamed = [];
+  const resolved = [];
+
+  for (const issue of unmatched) {
+    const was = keyShape(issue.key);
+    const now =
+      was &&
+      open.find((item) => {
+        const shape = keyShape(item.key);
+        return (
+          item.problem === issue.problem &&
+          shape &&
+          shape.course === was.course &&
+          shape.rest === was.rest &&
+          shape.slug !== was.slug
+        );
+      });
+
+    if (now) renamed.push({ issue, key: now.key, from: was.slug, to: keyShape(now.key).slug });
+    else resolved.push(issue);
+  }
+
+  return { renamed, resolved };
+}
