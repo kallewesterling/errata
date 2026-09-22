@@ -206,6 +206,22 @@ The command `$ apk update` appears in four courses and does not matter, because 
 
 ## How errata reports
 
+### A category is not a severity
+
+Errata reports two things about every finding, and they answer different questions. Severity says how loudly to report it. The category says what kind of work it needs.
+
+Keeping them apart matters because they do not line up. A dead link is a defect and should fail. A redirect that needs a person is also outside the repository, so it is stale, and it should not fail. A lesson body that is still the word `Placeholder` is neither: nothing about it is wrong, something about it is missing, and no amount of reading the repository will supply it.
+
+| Category | The repair | Who has it |
+|---|---|---|
+| `defect` | Fixable from evidence already in the repository. | Whoever is doing a markup pass. |
+| `stale` | The evidence is outside the repository. | Somebody who can go and look. |
+| `unwritten` | There is nothing to repair, only something to write. | The author who owns the course. |
+
+The distinction earns its place on one question a consumer could not ask before: everything I can fix from evidence already here. That is an afternoon's work. Chasing a redirect on somebody else's website is not, and drafting a lesson is not. Reported in one list, the three crowd each other out, and a list that cannot be finished in one sitting stops being worked through at all.
+
+The vocabulary is closed, and a test asserts every check declares one of the three. A check that invented a fourth would vanish from every report that asked for one of the three, which is the failure mode a free-text field has.
+
 ### A warning is not a failure
 
 The pairing makes a third class of problem visible: a command whose recorded output contradicts it. Errata reports these as warnings. A hit is a real inconsistency, but sometimes an author made it on purpose.

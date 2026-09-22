@@ -17,6 +17,7 @@ import {
   checkContentPaths,
   findUnreferencedContentFiles,
 } from "../src/integrity.js";
+import { CATEGORY_NAMES, isCategory } from "../src/categories.js";
 import { knownIssuesPath } from "../src/config.js";
 import { buildInventory } from "../src/inventory.js";
 import { accepted, inspect, open } from "../src/problems.js";
@@ -57,8 +58,23 @@ if (args.includes("--json")) {
  */
 if (args.includes("--problems")) {
   const { problems, stale, resolved, unknown, notes } = inspect(blocks);
-  const failing = open(problems);
-  const held = accepted(problems);
+
+  // --category narrows the report to one kind of work. A markup pass, a look
+  // at the world outside the repository, and a lesson nobody has drafted are
+  // three different sittings, and a list mixing them is acted on as one.
+  const category = flagValue("--category");
+  if (category !== null && !isCategory(category)) {
+    process.stderr.write(
+      `Unknown category ${JSON.stringify(category)}. ` +
+        `Use one of: ${CATEGORY_NAMES.join(", ")}.\n`,
+    );
+    process.exit(2);
+  }
+  const wanted =
+    category === null ? problems : problems.filter((p) => p.category === category);
+
+  const failing = open(wanted);
+  const held = accepted(wanted);
   const limitArg = flagValue("--limit");
   const limit = limitArg === null ? 10 : Number(limitArg) || Number.POSITIVE_INFINITY;
 

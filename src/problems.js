@@ -22,11 +22,13 @@ import {
   getInventory,
   getProseDefects,
   getScriptEntities,
+  getUnwritten,
 } from "./inventory.js";
 import {
   checkContentPaths,
   findUnreferencedContentFiles,
 } from "./integrity.js";
+import { CATEGORIES } from "./categories.js";
 import { DUPLICATION_PROBLEM_IDS } from "./duplication.js";
 import { indexIssues, loadKnownIssues } from "./known-issues.js";
 import { LINK_PROBLEM_IDS } from "./link-health.js";
@@ -39,6 +41,8 @@ import { REMEDIATION, warningItem } from "./warnings.js";
 /**
  * @typedef {object} Problem
  * @property {string} id        Stable name, used to select a single check.
+ * @property {import("./categories.js").Category} category  What kind of work
+ *   it needs: a markup pass, a look at the world, or an author.
  * @property {string} title     What is wrong, read after a count.
  * @property {string} [why]     Why it matters.
  * @property {string} fix       What to do about it.
@@ -97,6 +101,7 @@ export function collectProblems(blocks = getInventory()) {
   const scriptEntities = getScriptEntities();
   const inlineCode = getInlineCode();
   const proseDefects = getProseDefects();
+  const unwritten = getUnwritten();
   const unusedLangs = knownLangs.filter(
     (lang) => !blocks.some((block) => block.lang === lang),
   );
@@ -110,6 +115,7 @@ export function collectProblems(blocks = getInventory()) {
   const problems = [
     {
       id: "unknown-lang",
+      category: "defect",
       title: "blocks with an unrecognized data-lang",
       why:
         "Tests dispatch on the language, so an unknown value means the block " +
@@ -122,6 +128,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "empty-blocks",
+      category: "unwritten",
       title: "empty code blocks",
       why: "An empty <pre> renders as a blank box and teaches nothing.",
       fix: "Add the missing code, or delete the block from the lesson HTML.",
@@ -129,6 +136,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "unterminated-block",
+      category: "defect",
       title: "unterminated code blocks",
       why:
         "The block has no closing tag, so its extent cannot be determined and " +
@@ -140,6 +148,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "invalid-config",
+      category: "defect",
       title: "config blocks that do not parse",
       why:
         "The block is neither valid nor a recognizable excerpt of a larger " +
@@ -159,6 +168,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "unchecked-config",
+      category: "defect",
       title: "config blocks with no parser wired up",
       why: "The block is treated as configuration but nothing validates it.",
       fix:
@@ -168,6 +178,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "promptless-shell",
+      category: "defect",
       title: "shell blocks with no prompt marker",
       why:
         "Without a prompt a reader cannot tell which lines to type and which " +
@@ -179,6 +190,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "commandless-runnable",
+      category: "defect",
       title: "runnable blocks with no command",
       why: "The block is marked executable but nothing could be extracted to run.",
       fix: "Check the prompt splitting in src/classify.js against this block.",
@@ -188,6 +200,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "runnable-output",
+      category: "defect",
       title: "output blocks marked runnable",
       why: "By convention ansi holds output only, which must never be executed.",
       fix: "Check the kind mapping and runnable rule in src/classify.js.",
@@ -195,6 +208,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "unpaired-output",
+      category: "defect",
       title: "output blocks with no command to attach to",
       why:
         "An ansi block is the output of the command before it, but nothing " +
@@ -210,6 +224,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "mislabeled-output",
+      category: "defect",
       title: "blocks labelled as output that contain a command",
       why:
         'data-lang="ansi" means output only. These carry a shell prompt, ' +
@@ -225,6 +240,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "cross-reference",
+      category: "defect",
       severity: "warning",
       title: "commands whose recorded output contradicts them",
       why:
@@ -240,6 +256,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "case-mismatched-paths",
+      category: "defect",
       title: "content paths whose case does not match disk",
       why:
         "These resolve on macOS, whose filesystem is case-insensitive, and " +
@@ -258,7 +275,32 @@ export function collectProblems(blocks = getInventory()) {
       })),
     },
     {
+      id: "unwritten-content",
+      category: /** @type {const} */ ("unwritten"),
+      severity: "warning",
+      title: "content nobody has written yet",
+      why:
+        "Nothing here is wrong; something here is missing, and no amount of " +
+        "reading the repository will supply it. A lesson body that is still " +
+        "the word Placeholder, an element holding a note where prose was " +
+        "meant to go, or a description still reading {Short description}. " +
+        "The browser renders a comment as nothing, so the gap is invisible " +
+        "to everyone except whoever opens the source.",
+      fix:
+        "Write it, or delete the scaffolding if the plan changed. This needs " +
+        "the author who owns the course rather than whoever is doing a " +
+        "markup pass, which is why it is reported apart from the defects.",
+      items: unwritten.map((found) => ({
+        summary: `${style.bad(found.match)}  ${style.muted(found.id)}`,
+        key: found.id,
+        fingerprint: found.fingerprint,
+        details: [["reads as unfinished", found.what]],
+        locations: [blockLocation(found)],
+      })),
+    },
+    {
       id: "comment-in-block",
+      category: "unwritten",
       title: "code blocks containing an HTML comment",
       why:
         "The browser drops the comment, so it is either invisible " +
@@ -281,6 +323,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "code-typography",
+      category: "defect",
       title: "typographic characters inside a code block",
       why:
         "A code block gets pasted into a shell, so anything that survives the " +
@@ -304,6 +347,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "mislabeled-dockerfile",
+      category: "defect",
       title: "Dockerfiles labelled as something else",
       why:
         "The block opens with FROM, so it is a Dockerfile whatever its " +
@@ -317,6 +361,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "unused-lang",
+      category: "stale",
       title: "languages in the taxonomy that no block uses",
       why:
         "An unused but permitted alias is how a corpus ends up with two " +
@@ -334,6 +379,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "markdown-in-prose",
+      category: "defect",
       title: "Markdown syntax in lesson prose",
       why:
         "These files are HTML, so Markdown renders as itself and the reader " +
@@ -355,6 +401,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "flattened-command",
+      category: "defect",
       severity: "warning",
       title: "commands run together into prose",
       why:
@@ -378,6 +425,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "prompted-output",
+      category: "defect",
       title: "output lines wearing a command prompt",
       why:
         "A $ prefix means \"type this\", so a line of program output that " +
@@ -408,6 +456,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "code-trailing-space",
+      category: "defect",
       title: "inline <code> elements whose text ends in a space",
       why:
         "There is no reason to write <code>--parent </code> unless something " +
@@ -427,6 +476,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "placeholder-residue",
+      category: "defect",
       severity: "warning",
       title: "blocks that look like a placeholder was eaten",
       why:
@@ -460,6 +510,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "script-entity",
+      category: "defect",
       title: "HTML entities inside an inline <script>",
       why:
         "A <script> is a raw-text element, so an entity inside one is never " +
@@ -482,6 +533,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "missing-paths",
+      category: "defect",
       title: "content files declared in metadata but absent from disk",
       why: "The lesson body cannot be loaded, so its code blocks are never tested.",
       fix:
@@ -495,6 +547,7 @@ export function collectProblems(blocks = getInventory()) {
     },
     {
       id: "unreferenced-files",
+      category: "defect",
       title: "content files no metadata points at",
       why:
         "Nothing in lessons-meta.json refers to these files, so any code they " +
@@ -514,6 +567,7 @@ export function collectProblems(blocks = getInventory()) {
   for (const anomaly of anomalies) {
     problems.push({
       id: `anomaly:${anomaly}`,
+      category: /** @type {const} */ ("defect"),
       title: `blocks with "${anomaly}"`,
       why: ANOMALY_HELP[anomaly]?.why,
       fix: ANOMALY_HELP[anomaly]?.fix ?? "Correct the block in the lesson HTML.",

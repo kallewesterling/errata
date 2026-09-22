@@ -38,6 +38,41 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- Every finding now declares a **category** — `defect`, `stale` or
+  `unwritten` — saying what kind of work it needs (`src/categories.js`).
+  `npm run inventory -- --problems --category defect` asks the question that
+  prompted this: everything I can fix from evidence already in the repository.
+
+  This is a separate axis from severity, and the two deliberately do not line
+  up. Severity says how loudly to report something; the category says who
+  fixes it and with what. A dead link is a defect and should fail; a redirect
+  needing a person is stale and should not; a lesson body still reading
+  `Placeholder` is neither, because nothing about it is wrong and something
+  about it is missing. A test pins that at least one check is a `defect`
+  reported only as a warning, which is the combination that shows the two
+  axes are independent rather than one relabelled.
+
+  The vocabulary is closed and every check is asserted to declare one of the
+  three, because a check inventing a fourth would disappear from every report
+  that asked for one of the three.
+
+- `unwritten-content`, a check for content nobody has written yet
+  (`src/unwritten.js`). Without it the new category would have been nearly
+  empty, since the scaffolding the request names was not detected at all: a
+  lesson body that is still `Placeholder`, an element holding only a comment
+  where prose was meant to go, and a metadata value still reading
+  `{Short description}`.
+
+  Against the courses content it finds 23 — two stub bodies, fourteen
+  comment-only elements and seven template values. The request counted five
+  comment-only elements, all of them `<p><!-- Lead --></p>`; the other nine
+  are notes about an image, some links, or a joke the author meant to return
+  to, and they are the same gap.
+
+  The rules describe the scaffolding rather than one project's wording. A
+  template value is matched on its shape, and the shape excludes serialized
+  JSON: `{"k": 1}` also opens and closes with a brace and is a real value.
+
 - A fixture lesson and tests pinning the six adjudicated cases — a container
   prompt, a `#` comment, a shebang script, a bare `#` on display, both output
   conventions, and backticks inside a `<pre>`. Each looks like a defect to a
