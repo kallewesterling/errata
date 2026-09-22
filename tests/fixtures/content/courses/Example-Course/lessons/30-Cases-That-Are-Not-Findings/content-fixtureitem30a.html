@@ -1,0 +1,23 @@
+<h2>Cases that are not findings</h2>
+<p class="lead">This lesson is fixture content, and unlike the others it exists for what it must <em>not</em> produce. Every block below looks like a defect to a rule that has not been told otherwise, and each one was adjudicated once already against a real body of content. The suite asserts that the checks stay silent here, so a later change that revives one of these fails a test rather than a review.</p>
+<p>A container prompt is a prompt. When a lesson attaches to a running container, the prompt the reader sees is the container's own, and replacing it with a dollar sign would hide the thing the lesson is teaching: that the command runs somewhere other than their machine.</p>
+<pre data-lang="console"><code>nginx:/# ps aux
+nginx:/# cat /etc/os-release</code></pre>
+<p>A hash opens a comment, not a root shell. Every occurrence of a leading hash in the content this was built against introduces a note to the reader. Reading them as commands invents steps that nobody is meant to run.</p>
+<pre data-lang="console"><code># Install on a machine that already has the tool
+$ example-tool plugins add linter</code></pre>
+<p>A script is not a transcript. A file the reader saves has no prompt by design, so the absence of one is correct rather than missing. It carries a shebang and a language of its own.</p>
+<pre data-lang="bash"><code>#!/usr/bin/env bash
+set -euo pipefail
+example-tool plugins list</code></pre>
+<p>A bare prompt on its own is a prompt on display. The lesson is showing the reader what the terminal looks like once the container has started, not giving them something to type, so the block is a transcript.</p>
+<pre data-lang="console"><code>$ example-tool debug attach</code></pre>
+<pre data-lang="ansi"><code>#</code></pre>
+<p>Both ways of showing output are correct, and the content uses both. One puts the transcript in a block of its own, which the lesson above already does. The other keeps it inside the command block, with the prompt telling the two apart.</p>
+<pre data-lang="console"><code>$ example-tool plugins add formatter
+added formatter 0.4.1
+$ example-tool plugins list --enabled
+linter
+formatter</code></pre>
+<p>Backticks inside a code block are not stray markup. They are command substitution, drawings, or output captured from a tool that printed them, and rewriting them would change what the reader runs.</p>
+<pre data-lang="console"><code>$ echo "built at `date --iso-8601=seconds`"</code></pre>

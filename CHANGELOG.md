@@ -38,6 +38,23 @@ tagged; it is the version `package.json` declared while the work landed.
 
 ### Added
 
+- A fixture lesson and tests pinning the six adjudicated cases — a container
+  prompt, a `#` comment, a shebang script, a bare `#` on display, both output
+  conventions, and backticks inside a `<pre>`. Each looks like a defect to a
+  rule that has not been told otherwise, and each was settled once against
+  real content. `docs/design.md` recorded two of the six; the other four
+  existed only in the content repository's style guide, which errata does not
+  read.
+
+  `tests/offline/adjudications.test.js` asserts both that each rule stays
+  quiet on the block it would have reported, and that the catalogue as a whole
+  reports nothing from that lesson. The second assertion is the one that
+  catches a rule nobody thought to exempt when adding it. Breaking the
+  host-prompt pattern on purpose fails three of these tests, including that
+  catch-all.
+
+  `bash` returns to the fixture taxonomy, used by the shebang block.
+
 - Six small checks, each measured against the content before and after its own
   repair pass. Together they find 51 sites before it and 4 after, and all four
   of those are real and still open.
