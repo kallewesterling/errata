@@ -24,7 +24,8 @@ import {
   touchesCode,
   worthTracking,
 } from "../src/duplication.js";
-import { applyKnownIssues } from "../src/problems.js";
+import { applyKnownIssues, inspect } from "../src/problems.js";
+import { collectSiblingProblems } from "../src/siblings.js";
 import { formatProblem, setColorEnabled, style } from "../src/report.js";
 
 const args = process.argv.slice(2);
@@ -94,6 +95,11 @@ const { problems } = applyKnownIssues(
   collectDuplicationProblems(pairs, has("--all") ? blockGroups : []),
 );
 
+// Cross the copy census with the rest of the findings. This is the only
+// place the two are both to hand: the offline lint does not compute pairs,
+// and computing them is the expensive half of this script.
+const siblings = collectSiblingProblems(inspect().problems, pairs);
+
 for (const problem of problems) {
   if (problem.items.length === 0) continue;
   process.stdout.write(
@@ -113,6 +119,17 @@ if (has("--all") && together.length > 0) {
   for (const pair of together.slice(0, 20)) {
     process.stdout.write(`  ${pair.a.label}\n  ${pair.b.label}\n\n`);
   }
+}
+
+for (const problem of siblings) {
+  if (problem.items.length === 0) continue;
+  process.stdout.write(
+    formatProblem({
+      ...problem,
+      accepted: 0,
+      limit: limit === 0 ? Number.MAX_SAFE_INTEGER : limit,
+    }),
+  );
 }
 
 process.stdout.write(
