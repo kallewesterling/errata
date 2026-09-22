@@ -375,6 +375,10 @@ tests/fixtures/     A synthetic content repository, for CI and for a quick run.
 .github/workflows/  The offline tier, on every pull request.
 ```
 
+## Change errata itself
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers running the suite, the measurement a new check has to pass before it ships, why the test fixture has to stay clean, and how to merge a stack of dependent pull requests without losing one.
+
 ## Next steps
 
 - Run the shell blocks in a container, and compare the result with the recorded output. The content has 478 runnable blocks and 634 commands. 95 of the blocks have recorded output.
