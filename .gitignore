@@ -10,7 +10,12 @@ _local-mirror/
 # only for development against a checkout in _local-mirror/.
 errata.yaml
 
-# The exception is the config of the synthetic content repository under
-# tests/fixtures/. It describes fixture content rather than real content, and
-# CI needs it, because the real content is not available there.
-!tests/fixtures/content/errata.yaml
+# The exception is the config of the synthetic content repositories under
+# tests/fixtures/. Those describe fixture content rather than real content,
+# and CI needs them, because the real content is not available there.
+#
+# Matched by wildcard rather than named one by one. The dirty fixture was
+# added with a rule naming only the clean one, so `git add -A` skipped its
+# config without saying anything and CI failed on a file that looked
+# committed.
+!tests/fixtures/*/errata.yaml

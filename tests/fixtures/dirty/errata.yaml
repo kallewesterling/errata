@@ -1,0 +1,52 @@
+# Configuration for the deliberately-broken content repository beside it.
+#
+# The clean fixture in `../content/` asserts that the checks find nothing.
+# This one asserts the opposite: it carries one instance of each finding, so
+# the suite proves a check reaches a report rather than only that its
+# detector works on a string.
+#
+# Keep it dirty, and keep it *exactly* dirty. Every finding here is named in
+# `tests/fixture/dirty.test.js`, and a block that trips a second check by
+# accident makes that test fail rather than passing quietly.
+
+contentRoot: courses
+knownIssuesFile: .errata.yaml
+primaryDomain: courses.example.com
+
+registryPrefixes:
+  - registry.example.com/
+nonImageNamespaces:
+  - java
+staleImageDays: 365
+
+# `terraform` is here and used by nothing, which is the unused-lang finding.
+languages:
+  console: { kind: shell }
+  ansi: { kind: output }
+  yaml: { kind: config, parser: yaml }
+  markup: { kind: source }
+  terraform: { kind: config, parser: hcl }
+
+privateImages:
+  allowedCourses: []
+
+anomalies:
+  - missing-lang
+  - missing-code-element
+  - unescaped-markup
+
+links:
+  ownedDomains:
+    - example.com
+  skip: []
+
+driftBudget:
+  staleImageRefs: 0
+
+duplication:
+  minWords: 50
+  shingleSize: 5
+  threshold: 0.80
+  ignoreElements:
+    - script
+    - style
