@@ -47,23 +47,37 @@ Where a shape cannot be detected precisely, say so in the source rather than
 leaving it out silently. `UNIMPLEMENTED_SHAPES` in `src/residue.js` is the
 pattern.
 
-## The fixture must stay clean
+## There are two fixtures, and they assert opposite things
 
-`tests/fixtures/content/` is a synthetic content repository that stands in for
-a real one in CI, where the real courses are not available. The content checks
-must come out **empty** against it.
+Both stand in for a real content repository in CI, where the real courses are
+not available.
 
-That has a consequence worth knowing before you add a check: you cannot
-demonstrate a new finding by adding a defect to the fixture, because the suite
-asserts there are none. Two things follow.
+`tests/fixtures/content/` is **clean**. The checks must come out empty against
+it. So you cannot demonstrate a new finding by adding a defect to it, and you
+should not try: what belongs there is a case that must **not** be reported. An
+adjudicated case — a container prompt, a shebang block — goes there precisely
+because the fixture asserts silence, and `tests/offline/adjudications.test.js`
+names each one.
 
-Test the detector directly, on an HTML string in the test file. Most checks
-here are a pure function over text, and a test that states its input outright
-reads better than one that sends the reader to a fixture.
+`tests/fixtures/dirty/` is **broken on purpose**, one instance of each finding,
+and `tests/fixture/dirty.test.js` asserts the exact set. It is its own vitest
+project, because the content a run checks is chosen by an environment variable
+read once and the rest of the suite needs the clean one.
 
-Add to the fixture when the case is something that must **not** be reported.
-An adjudicated case — a container prompt, a shebang block — belongs there
-precisely because the fixture asserts silence.
+Adding a check means adding to both:
+
+- a defect in the dirty fixture, and a line in that test's `PLANTED` table
+- if the check has an adjudicated exception, a block in the clean fixture
+
+Also test the detector directly, on an HTML string in the test file. Most
+checks here are a pure function over text, and a test that states its input
+outright reads better than one that sends the reader to a fixture.
+
+The two do different jobs and neither replaces the other. A unit test says the
+detector works. The dirty fixture says the check reaches a report — that it is
+wired to the right inventory, builds a key that does not collide, carries a
+fingerprint and a location, and appears in `collectProblems` at all. A check
+can pass every unit test in the suite while being wired to nothing.
 
 ## Merging a stack
 

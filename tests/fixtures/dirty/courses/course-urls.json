@@ -1,0 +1,4 @@
+{
+  "description": "Course directory -> public URL, so findings carry a lesson URL.",
+  "urls": { "Dirty-Course": "https://courses.example.com/dirty-course" }
+}
