@@ -371,6 +371,28 @@ and that the catalogue as a whole reports nothing from that lesson. The second
 assertion is the one that catches a rule nobody thought to exempt.
 
 
+## What errata replaces
+
+Errata replaces three scripts. Each of them checks whether a URL answers.
+
+| Script | Where it lives | Why errata replaces it |
+|---|---|---|
+| `tools/chainlink` | Content repository | See the table below. |
+| `tools/check-course-image-urls` | Content repository | It checks the image manifest. Errata checks the images that the lessons show. |
+| `check:links` | Syncjar | It reads a gitignored copy of the same lessons. It misses moved links and bad anchors. |
+
+These are the differences from `chainlink`:
+
+| Case | chainlink | errata |
+|---|---|---|
+| A request times out | Records it as a 404 | Reports it separately, as unreachable |
+| A page moved | Reports it as healthy | Rewrites it, or holds it for a person |
+| A `#anchor` is missing | Does not see it | Reports it |
+| Output | An issue that lists URLs | A pull request with the repairs applied |
+| A skipped link | A bare regular expression in `ignore.json` | A pattern with a reason that you must give |
+
+Every entry in `links.skip` needs a `why`. A skip with no reason looks the same as a broken link that somebody gave up on. Nothing in that file expires, so the reason must be there from the start.
+
 ## Why errata replaces the check:links script in Syncjar
 
 Syncjar has a script with the same name. It does not check a different population. The directory `public/courses/` is a copy of the same lessons. The command `npm run generate:courses` writes it from the same `lessons-meta.json`. It is the same set of links, read from a gitignored copy that exists only after a preview build.

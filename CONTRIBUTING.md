@@ -124,6 +124,67 @@ wired to the right inventory, builds a key that does not collide, carries a
 fingerprint and a location, and appears in `collectProblems` at all. A check
 can pass every unit test in the suite while being wired to nothing.
 
+## Project layout
+
+Errata holds no settings of its own. Both files below live in the content
+repository.
+
+```
+errata.example.yaml              A template to copy into your content repository.
+<content repo>/errata.yaml       Settings: paths, taxonomy, limits, allowlists.
+<content repo>/.errata.yaml      Accepted findings and standing notes.
+```
+
+`src/` splits into three layers. Extraction builds an inventory from the
+files, detection decides what is wrong with it, and the catalogue says how to
+report that. A new check almost always adds to the middle layer only.
+
+```
+src/
+  Loading
+    config.js         Loads and validates errata.yaml.
+    known-issues.js   Reads .errata.yaml, and tells a rename from a repair.
+    mirror.js         Source adapter: courses, lessons, and public URLs.
+    categories.js     What kind of work a finding needs.
+
+  Extraction
+    extract.js        Finds the code blocks. Detects anomalies.
+    inline-code.js    Reads the <code> elements that sit in prose.
+    prose-links.js    Reads <a href> and <img src> from the source text.
+    scripts.js        Reads the inline <script> elements.
+    inventory.js      Assembles every record the checks read.
+    classify.js       Language kinds, shell splitting, image and URL detection.
+    pairing.js        Links an output block to the command that produced it.
+    parse-config.js   Parses JSON, YAML, Dockerfile, and HCL blocks.
+    integrity.js      Compares the metadata with the disk.
+
+  Detection
+    markup.js         Comments, typography, and mislabelled Dockerfiles.
+    residue.js        Placeholders the HTML parser ate.
+    prose-defects.js  Markdown that never rendered; commands lost in a sentence.
+    unwritten.js      Content nobody has written yet.
+    output-prefixes.js  An output line wearing a command prompt.
+    warnings.js       Offline rules comparing a command with its own output.
+    duplication.js    Visible text, shingles, and drift between copies.
+    siblings.js       What a finding in one copy implies about its twin.
+    registry.js       Resolves registry manifests without a login.
+    links.js          URL liveness, redirects, and anchor validation.
+    link-health.js    Decides which redirects are safe to apply.
+    drift.js          The age of each pinned digest, measured at the registry.
+
+  Reporting
+    problems.js       The catalogue: what each check finds, why, and the repair.
+    report.js         Colour, and the what/where/repair layout.
+
+scripts/              The three command-line tools.
+tests/offline/        Fast tier, against whatever content the run is pointed at.
+tests/pinned/clean/   Against the clean fixture: adjudicated cases stay silent.
+tests/pinned/dirty/   Against the broken fixture: each check reaches a report.
+tests/network/        Slower tier. Needs the network.
+tests/fixtures/       The two synthetic content repositories.
+.github/workflows/    The offline and pinned tiers, on every pull request.
+```
+
 ## Merging a stack
 
 Dependent pull requests each based on the last need care, and getting it wrong
