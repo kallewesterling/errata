@@ -1,6 +1,6 @@
 {
   "name": "@kallewesterling/errata",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Finds errors in the code examples inside published course content, and keeps a dated record of the ones not yet fixed.",

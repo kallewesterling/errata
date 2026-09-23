@@ -22,8 +22,12 @@ function contentEnv() {
     };
   }
 
-  const mirror = path.join(here, "_local-mirror", "courses", "errata.yaml");
-  if (fs.existsSync(mirror)) return { ERRATA_CONFIG: mirror };
+  // Both config names, newest first, so a mirror checked out before the
+  // rename keeps working without anybody having to touch it.
+  for (const name of ["errata.config.yaml", "errata.yaml"]) {
+    const mirror = path.join(here, "_local-mirror", "courses", name);
+    if (fs.existsSync(mirror)) return { ERRATA_CONFIG: mirror };
+  }
 
   return {};
 }
@@ -53,7 +57,7 @@ export default defineConfig({
           include: ["tests/pinned/clean/**/*.test.js"],
           testTimeout: 60_000,
           env: {
-            ERRATA_CONFIG: path.join(here, "tests", "fixtures", "content", "errata.yaml"),
+            ERRATA_CONFIG: path.join(here, "tests", "fixtures", "content", "errata.config.yaml"),
           },
         },
       },
@@ -63,7 +67,7 @@ export default defineConfig({
           include: ["tests/pinned/dirty/**/*.test.js"],
           testTimeout: 60_000,
           env: {
-            ERRATA_CONFIG: path.join(here, "tests", "fixtures", "dirty", "errata.yaml"),
+            ERRATA_CONFIG: path.join(here, "tests", "fixtures", "dirty", "errata.config.yaml"),
           },
         },
       },

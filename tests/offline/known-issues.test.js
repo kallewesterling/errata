@@ -9,7 +9,7 @@ const dirs = [];
 function withFile(text) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cct-issues-"));
   dirs.push(dir);
-  const file = path.join(dir, ".errata.yaml");
+  const file = path.join(dir, ".errata-accepted.yaml");
   fs.writeFileSync(file, text);
   return file;
 }
@@ -48,7 +48,7 @@ describe("reading the known-issues file", () => {
    * turn a wrong path into a silently passing suite.
    */
   it("treats a missing file as nothing accepted", () => {
-    expect(loadKnownIssues("/nonexistent/.errata.yaml")).toEqual({
+    expect(loadKnownIssues("/nonexistent/.errata-accepted.yaml")).toEqual({
       issues: [],
       notes: [],
     });

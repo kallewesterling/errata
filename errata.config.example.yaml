@@ -1,14 +1,17 @@
 # Configuration for errata.
 #
-# Copy this file to the root of your content repository, name it `errata.yaml`,
-# and edit the values. The settings describe your content, so they belong with
-# the content and not with errata.
+# Copy this file to the root of your content repository, name it
+# `errata.config.yaml`, and edit the values. The settings describe your content,
+# so they belong with the content and not with errata.
 #
 # errata finds this file in three ways, and takes the first one that exists:
 #
 #   1. The path in ERRATA_CONFIG.
-#   2. `errata.yaml` beside ERRATA_ROOT, or in its parent directory.
-#   3. `errata.yaml` in the working directory, or any directory above it.
+#   2. `errata.config.yaml` beside ERRATA_ROOT, or in its parent directory.
+#   3. `errata.config.yaml` in the working directory, or any directory above it.
+#
+# The older name `errata.yaml` is still read, second in each directory, and
+# warns. Rename it: it was a character away from the accepted-findings file.
 #
 # Unknown top-level keys are rejected, so a typo fails loudly instead of taking
 # a default value in silence.
@@ -24,7 +27,7 @@ contentRoot: courses
 #
 # Keep it a dotfile at the repository root. That puts it outside the directories
 # a content sync walks, so it survives a round trip to the publishing system.
-knownIssuesFile: ../.errata.yaml
+knownIssuesFile: ../.errata-accepted.yaml
 
 # Domain whose published slugs build the public lesson URLs.
 primaryDomain: courses.example.com

@@ -9,7 +9,34 @@ Entries for 0.1.0 were reconstructed from git history after the fact, so they
 group related commits rather than listing each one. That version was never
 tagged; it is the version `package.json` declared while the work landed.
 
-## [Unreleased]
+## [0.2.0] — 2026-09-23
+
+### Changed
+
+- The settings file is now `errata.config.yaml`. It was `errata.yaml`, which
+  differed from `.errata.yaml` beside it by a leading dot — two files that are
+  unlike in every way that matters, one written once and one a growing ledger
+  of decisions, told apart by a character that a reader skimming a shell
+  transcript does not see. `errata.config.yaml` follows the convention of the
+  ecosystem errata ships in: `vite.config.js`, `eslint.config.js`, and this
+  repository's own `vitest.config.js`.
+
+  **Nothing breaks.** `errata.yaml` still loads, second in each searched
+  directory, and prints a deprecation warning naming the file to rename. It is
+  second within a directory rather than after the whole search, so a repository
+  that has adopted the new name is never answered by a stale copy of the old
+  one left beside it. `ERRATA_CONFIG` takes the path you give it under any
+  name, so a pinned path needs no change.
+
+  `errata.example.yaml` is now `errata.config.example.yaml`, so that copying
+  the template and naming the copy is one obvious step rather than two.
+
+- The template names the accepted-findings file `.errata-accepted.yaml`, where
+  it said `.errata.yaml`. This is a change to `errata.config.example.yaml` and
+  to the documentation only: `knownIssuesFile` has always named this file
+  explicitly and is still required, so errata never looked for either name and
+  an existing content repository is unaffected. To adopt it, rename the file
+  and edit that one setting. `git log --follow` keeps the history.
 
 ### Fixed
 

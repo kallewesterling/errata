@@ -6,15 +6,23 @@ This document records the decisions behind the checks in errata. The [README](..
 
 ### The settings live with the content, not with the tool
 
-Errata contains no configuration. It ships `errata.example.yaml` as a template, and nothing else.
+Errata contains no configuration. It ships `errata.config.example.yaml` as a template, and nothing else.
 
 The settings answer questions about one body of content: which registry hosts its images, which courses may use a private image, which domains it owns. None of those are facts about errata. A default inside the tool would therefore be one project's answers, presented to every other project as a starting point.
 
 This also keeps the tool honest. A check cannot quietly grow a rule that only suits one content repository, because there is nowhere in errata to put it. The registry namespaces that are not repositories were the last such rule, and they now sit in `nonImageNamespaces`.
 
-The known-issues file already lived with the content, for the reasons under [Why .errata.yaml lives with the content](#why-erratayaml-lives-with-the-content-and-why-it-is-a-dotfile). The settings follow it, and for the same reason.
+The known-issues file already lived with the content, for the reasons under [Why .errata-accepted.yaml lives with the content](#why-errata-acceptedyaml-lives-with-the-content-and-why-it-is-a-dotfile). The settings follow it, and for the same reason.
 
 One consequence is worth stating. Errata on its own cannot run, because it has nothing to check and no opinion about what correct means. It fails at load time and lists every path it searched.
+
+### The settings file is named apart from the findings file
+
+Both files live at the content root, and the first names were `errata.yaml` and `.errata.yaml`. A leading dot is the whole difference, which is too little to carry it. The two are unlike in every way that matters: one is settings a person writes once and rarely touches, the other is a ledger of decisions that grows and expires. Every sentence naming one of them had to name it twice to be understood, and a reader skimming a shell transcript could not tell which file a command had touched.
+
+`errata.config.yaml` follows the convention of the ecosystem errata ships in — `vite.config.js`, `eslint.config.js`, and this repository's own `vitest.config.js`. Leaving it undotted is deliberate: a dotted `.errata-config.yaml` would sort next to `.errata-accepted.yaml` and share seven leading characters with it, which is the problem again in a new spelling. The findings file stays a dotfile for the reason below; the settings file has no such requirement, since the content sync walks `[A-Z]*/lessons/` and never sees either.
+
+The old name still loads, because a content repository belongs to somebody else and a release of errata should not stop their checks running until they rename a file. It is tried second within each directory rather than after the whole search, so a repository that has adopted the new name cannot be answered by a stale copy of the old one sitting beside it. Directory order still dominates filename: the nearest config wins, which is the rule that was already documented.
 
 ### Extraction and tests are separate layers
 
@@ -280,7 +288,7 @@ The suite started work against content that already had problems.
 
 The first version held each problem at a count, and failed when the count grew. That was the wrong shape. A number tells you only how many instances somebody tolerated. It cannot tell you which instance, or why. It also cannot see one instance repaired while another appears, because the total stays the same.
 
-`.errata.yaml` records each accepted finding on its own: which check, which instance, why it is unfixed, and the date of that decision.
+`.errata-accepted.yaml` records each accepted finding on its own: which check, which instance, why it is unfixed, and the date of that decision.
 
 The fingerprint keeps the file current. An entry stores the hash of the block that it covers. An edit to that block opens the finding again, so an entry cannot excuse content that nobody has read since.
 
@@ -296,7 +304,7 @@ The two are separable because only the slug moves. A key is `course/lesson-slug/
 
 Keys that are not lesson-shaped — a language name, a bare path, a pair of lesson ids — do not participate, so a rename is never invented for them.
 
-### Why .errata.yaml lives with the content, and why it is a dotfile
+### Why .errata-accepted.yaml lives with the content, and why it is a dotfile
 
 The content repository syncs with Skilljar in both directions. A daily CI job pulls Skilljar into git. Anything inside the lesson HTML must therefore survive a round trip through a rich-text editor. That editor can drop an HTML comment without a warning.
 

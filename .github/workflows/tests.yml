@@ -40,7 +40,7 @@ jobs:
     env:
       # Selects the fixture content repository. vitest.config.js passes this
       # through, and src/config.js prefers it over anything it would discover.
-      ERRATA_CONFIG: tests/fixtures/content/errata.yaml
+      ERRATA_CONFIG: tests/fixtures/content/errata.config.yaml
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

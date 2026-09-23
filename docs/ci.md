@@ -15,12 +15,12 @@ env:
   ERRATA_ROOT: ${{ github.workspace }}/courses
 ```
 
-Errata carries no settings, so it looks for `errata.yaml` beside that path and
-in the directory above it, which finds the one at the root of the content
-repository. That file's `contentRoot` is then overridden by the same variable,
-so the tool runs against this checkout rather than wherever the config says.
-The known-issues file resolves relative to the content root, which also lands
-it here.
+Errata carries no settings, so it looks for `errata.config.yaml` beside that
+path and in the directory above it, which finds the one at the root of the
+content repository. That file's `contentRoot` is then overridden by the same
+variable, so the tool runs against this checkout rather than wherever the
+config says. The known-issues file resolves relative to the content root,
+which also lands it here.
 
 ## 1. A gate on every content pull request
 
@@ -35,8 +35,8 @@ on:
   pull_request:
     paths:
       - 'courses/**'
-      - 'errata.yaml'
-      - '.errata.yaml'
+      - 'errata.config.yaml'
+      - '.errata-accepted.yaml'
 
 permissions: {}
 
@@ -108,9 +108,9 @@ blocking:
           } >> "$GITHUB_STEP_SUMMARY"
 ```
 
-Problems with `.errata.yaml` itself fail whatever category you filter to. An
-entry that no longer describes reality is a defect in the file, and the one to
-watch is `renamed`: retitling a lesson changes its slug, which silently
+Problems with `.errata-accepted.yaml` itself fail whatever category you filter
+to. An entry that no longer describes reality is a defect in the file, and the
+one to watch is `renamed`: retitling a lesson changes its slug, which silently
 detaches every acceptance against it.
 
 ## 2. A scheduled link check that opens the repairs

@@ -15,7 +15,7 @@ contentRoot: courses
 
 # Findings that are known and deliberately not fixed yet. The fixture has
 # none, but the file has to exist for the plumbing to be exercised.
-knownIssuesFile: ../.errata.yaml
+knownIssuesFile: ../.errata-accepted.yaml
 
 # Domain whose published slugs build the public lesson URLs.
 primaryDomain: courses.example.com

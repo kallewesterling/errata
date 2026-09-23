@@ -26,7 +26,7 @@ usable as a build gate: fail on `defect`, report the rest. An unknown category
 name is rejected rather than silently matching nothing. See
 [Running errata in CI](ci.md).
 
-Use `--problems` when you repair content. It exits with a non-zero code for an open finding, and for an entry that is stale or resolved. You can therefore run it before a commit. It also prints the key to copy into `.errata.yaml`.
+Use `--problems` when you repair content. It exits with a non-zero code for an open finding, and for an entry that is stale or resolved. You can therefore run it before a commit. It also prints the key to copy into `.errata-accepted.yaml`.
 
 Add `--color` or `--no-color` to override the automatic detection.
 
@@ -99,7 +99,7 @@ Errata holds no settings of its own, so its own suite must be pointed at a conte
 To use it yourself:
 
 ```bash
-ERRATA_CONFIG=tests/fixtures/content/errata.yaml npm run test:offline
+ERRATA_CONFIG=tests/fixtures/content/errata.config.yaml npm run test:offline
 ```
 
 The fixture proves that the checks work. It says nothing about the real content. Run the suite against a real checkout for that.
