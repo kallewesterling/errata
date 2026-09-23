@@ -10,11 +10,11 @@ Errata carries no configuration, so its own tests have to be pointed at a
 content repository like any other caller:
 
 ```bash
-ERRATA_CONFIG=tests/fixtures/content/errata.yaml npm run test:offline
+ERRATA_CONFIG=tests/fixtures/content/errata.config.yaml npm run test:offline
 npm run typecheck
 ```
 
-That is what CI runs. A bare `npm test` discovers whatever `errata.yaml` is
+That is what CI runs. A bare `npm test` discovers whatever `errata.config.yaml` is
 nearest, which on a development machine is usually a real content checkout, so
 it reports real findings in that content rather than failures in your change.
 Both are useful. Only the first tells you whether the change is sound.
@@ -130,9 +130,9 @@ Errata holds no settings of its own. Both files below live in the content
 repository.
 
 ```
-errata.example.yaml              A template to copy into your content repository.
-<content repo>/errata.yaml       Settings: paths, taxonomy, limits, allowlists.
-<content repo>/.errata.yaml      Accepted findings and standing notes.
+errata.config.example.yaml            A template to copy into your content repository.
+<content repo>/errata.config.yaml    Settings: paths, taxonomy, limits, allowlists.
+<content repo>/.errata-accepted.yaml Accepted findings and standing notes.
 ```
 
 `src/` splits into three layers. Extraction builds an inventory from the
@@ -142,8 +142,8 @@ report that. A new check almost always adds to the middle layer only.
 ```
 src/
   Loading
-    config.js         Loads and validates errata.yaml.
-    known-issues.js   Reads .errata.yaml, and tells a rename from a repair.
+    config.js         Loads and validates errata.config.yaml.
+    known-issues.js   Reads the findings file; tells a rename from a repair.
     mirror.js         Source adapter: courses, lessons, and public URLs.
     categories.js     What kind of work a finding needs.
 

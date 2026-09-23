@@ -10,7 +10,7 @@
 # accident makes that test fail rather than passing quietly.
 
 contentRoot: courses
-knownIssuesFile: .errata.yaml
+knownIssuesFile: ../.errata-accepted.yaml
 primaryDomain: courses.example.com
 
 registryPrefixes:

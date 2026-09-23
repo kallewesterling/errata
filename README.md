@@ -11,7 +11,7 @@ Errata works next to [Syncjar](https://github.com/kallewesterling/syncjar), whic
 ## Requirements
 
 - Node.js 20 or later.
-- A content repository with an `errata.yaml` in it. See [Configuring errata](docs/configuration.md).
+- A content repository with an `errata.config.yaml` in it. See [Configuring errata](docs/configuration.md).
 
 ## Quick start
 
@@ -19,7 +19,7 @@ Clone errata beside your content repository:
 
 ```
 ~/code/
-  courses/    <- your content, with errata.yaml at its root
+  courses/    <- your content, with errata.config.yaml at its root
   errata/     <- this tool
 ```
 
@@ -81,7 +81,7 @@ This is the distinction that makes errata usable in CI: fail the build on `defec
 
 ## Accept a finding that you cannot fix now
 
-Every check must come out clean. If you cannot fix a finding now, record it in `.errata.yaml` at the root of the **content** repository, with a reason and a date. An entry without a reason fails, and an entry stops applying as soon as the content it describes is edited.
+Every check must come out clean. If you cannot fix a finding now, record it in `.errata-accepted.yaml` at the root of the **content** repository, with a reason and a date. An entry without a reason fails, and an entry stops applying as soon as the content it describes is edited.
 
 [Reading and accepting findings](docs/findings.md) covers the four states an entry can be in, and why `renamed` and `resolved` need opposite responses.
 
@@ -91,7 +91,7 @@ Every check must come out clean. If you cannot fix a finding now, record it in `
 |---|---|
 | [Configuring errata](docs/configuration.md) | The settings file, how errata finds it, and what each setting decides. |
 | [Commands](docs/commands.md) | Every command and flag, and the two test tiers. |
-| [Reading and accepting findings](docs/findings.md) | What to do with a finding, and how `.errata.yaml` works. |
+| [Reading and accepting findings](docs/findings.md) | What to do with a finding, and how `.errata-accepted.yaml` works. |
 | [Running errata in CI](docs/ci.md) | Three workflow shapes, all in production. |
 | [Using errata with Syncjar](docs/syncjar.md) | The pull, check, fix, push loop. |
 | [Design notes](docs/design.md) | Why each check works the way it does. |

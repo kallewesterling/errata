@@ -6,13 +6,13 @@ For what to do with a finding once errata reports one, read [findings.md](findin
 
 ## The file
 
-Copy [`errata.example.yaml`](../errata.example.yaml) to the root of your content repository, name it `errata.yaml`, and edit it.
+Copy [`errata.config.example.yaml`](../errata.config.example.yaml) to the root of your content repository, name it `errata.config.yaml`, and edit it.
 
 ```
 your-content-repo/
-  errata.yaml     <- settings
-  .errata.yaml    <- accepted findings
-  courses/        <- the content itself
+  errata.config.yaml     <- settings
+  .errata-accepted.yaml  <- accepted findings
+  courses/               <- the content itself
 ```
 
 The file records:
@@ -30,19 +30,25 @@ The file records:
 Errata takes the first of these that exists:
 
 1. The path in `ERRATA_CONFIG`.
-2. `errata.yaml` beside `ERRATA_ROOT`, or in the directory above it.
-3. `errata.yaml` in the working directory, or in any directory above it.
+2. `errata.config.yaml` beside `ERRATA_ROOT`, or in the directory above it.
+3. `errata.config.yaml` in the working directory, or in any directory above it.
 
 Rule 2 means that pointing errata at content is enough. Rule 3 means that errata works with no environment variables when you run it inside the content repository.
 
 If errata finds no file, it stops and lists every path that it tried.
 
 ```bash
-ERRATA_ROOT=../courses/courses npm test           # Finds ../courses/errata.yaml.
-ERRATA_CONFIG=/path/to/errata.yaml npm test       # Names the file directly.
+ERRATA_ROOT=../courses/courses npm test             # Finds ../courses/errata.config.yaml.
+ERRATA_CONFIG=/path/to/errata.config.yaml npm test  # Names the file directly.
 ```
 
 A relative `contentRoot` resolves against the config file, not against errata.
+
+### The name used before 0.2.0
+
+Rules 2 and 3 also accept `errata.yaml`. It is tried second in each directory, so a repository that has adopted the new name is never answered by an old copy left beside it; directory order still dominates, and the nearest config wins. Reading one prints a deprecation warning. Rule 1 takes the path you give it, under any name.
+
+The old name differed from the accepted-findings file beside it by a leading dot and nothing else. See [the design notes](design.md#the-settings-file-is-named-apart-from-the-findings-file) for why that was worth changing.
 
 ## Validation is strict
 

@@ -8,19 +8,35 @@ export const repoRoot = path.resolve(
   "..",
 );
 
-const CONFIG_NAME = "errata.yaml";
+const CONFIG_NAME = "errata.config.yaml";
+
+/**
+ * The name this file used before 0.2.0.
+ *
+ * It was one leading dot away from the accepted-findings file beside it, then
+ * called `.errata.yaml`, so a sentence naming either one had to be read twice.
+ * Both config names still work, because a content repository belongs to
+ * somebody else and a release here should not stop their checks running until
+ * they rename a file. The old one is looked for second within each directory
+ * rather than after the whole search, so a repository that has adopted the new
+ * name is never answered by a stale copy of the old one left next to it.
+ */
+const LEGACY_CONFIG_NAME = "errata.yaml";
+
+const EXAMPLE_NAME = "errata.config.example.yaml";
 
 /**
  * Locate the config file.
  *
  * The settings describe a body of content, not this tool, so the file belongs
- * with the content. errata itself ships only `errata.example.yaml`; a checkout
- * of errata on its own has nothing to check and no opinion about what correct
- * means, so there is no default to fall back to.
+ * with the content. errata itself ships only `errata.config.example.yaml`; a
+ * checkout of errata on its own has nothing to check and no opinion about what
+ * correct means, so there is no default to fall back to.
  *
  * Search order, first hit wins:
  *
- *   1. ERRATA_CONFIG, when set.
+ *   1. ERRATA_CONFIG, when set. An explicit path is taken as given, whatever
+ *      the file is called.
  *   2. Beside ERRATA_ROOT, then in its parent. Pointing at content is enough
  *      to find the settings that go with it.
  *   3. Walking up from the working directory, which finds it when you run
@@ -32,22 +48,37 @@ function discoverConfig() {
   if (process.env.ERRATA_CONFIG) return path.resolve(process.env.ERRATA_CONFIG);
 
   const tried = [];
+  const lookIn = (dir) => {
+    tried.push(path.join(dir, CONFIG_NAME));
+    tried.push(path.join(dir, LEGACY_CONFIG_NAME));
+  };
+
   if (process.env.ERRATA_ROOT) {
     const root = path.resolve(process.env.ERRATA_ROOT);
-    tried.push(path.join(root, CONFIG_NAME));
-    tried.push(path.join(path.dirname(root), CONFIG_NAME));
+    lookIn(root);
+    lookIn(path.dirname(root));
   }
   for (let dir = process.cwd(); ; dir = path.dirname(dir)) {
-    tried.push(path.join(dir, CONFIG_NAME));
+    lookIn(dir);
     if (path.dirname(dir) === dir) break;
   }
 
   const found = tried.find((file) => fs.existsSync(file));
-  if (found) return found;
+  if (found) {
+    if (path.basename(found) === LEGACY_CONFIG_NAME) {
+      process.emitWarning(
+        `${found} uses the old config filename. Rename it to ${CONFIG_NAME}. ` +
+          `${LEGACY_CONFIG_NAME} still works, but it reads too much like the ` +
+          `accepted-findings file beside it.`,
+        "DeprecationWarning",
+      );
+    }
+    return found;
+  }
 
   throw new Error(
     `No ${CONFIG_NAME} found. It belongs with the content it describes, not ` +
-      `with errata.\n\nCopy ${path.join(repoRoot, "errata.example.yaml")} to ` +
+      `with errata.\n\nCopy ${path.join(repoRoot, EXAMPLE_NAME)} to ` +
       `the root of your content repository and edit it, or set ERRATA_CONFIG ` +
       `to an existing file.\n\nLooked in:\n${tried.map((f) => `  ${f}`).join("\n")}`,
   );
@@ -226,7 +257,7 @@ export const contentRoot = process.env.ERRATA_ROOT
 /** Domain whose published slugs are used to build public lesson URLs. */
 export const primaryDomain = config.primaryDomain;
 
-/** @see errata.yaml for what `kind` and `parser` mean. */
+/** @see errata.config.yaml for what `kind` and `parser` mean. */
 export const langTaxonomy = config.languages;
 
 export const knownLangs = Object.freeze(Object.keys(langTaxonomy));

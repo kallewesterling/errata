@@ -3,7 +3,9 @@
 Every check errata runs reports a finding the same way: what is wrong, where it is, and what the repair is. This page covers what to do with one.
 
 
-Every check must come out clean. If you cannot fix a finding now, record it in `.errata.yaml`. This file is at the root of the **content** repository, not in errata.
+Every check must come out clean. If you cannot fix a finding now, record it in `.errata-accepted.yaml`. This file is at the root of the **content** repository, not in errata.
+
+`knownIssuesFile` in the settings names it, so the name is yours to choose. Before 0.2.0 the template called it `.errata.yaml`, one character from the settings file beside it. Renaming it is a rename plus one edit to `knownIssuesFile`; nothing in errata looks for either name.
 
 Each entry names one finding:
 

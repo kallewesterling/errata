@@ -6,8 +6,10 @@ node_modules/
 _local-mirror/
 
 # Project config belongs with the content, not with the tool.
-# Copy errata.example.yaml to your content repository. A local one here is
-# only for development against a checkout in _local-mirror/.
+# Copy errata.config.example.yaml to your content repository. A local one here
+# is only for development against a checkout in _local-mirror/.
+# errata.yaml is the name used before 0.2.0, still read and still ignored here.
+errata.config.yaml
 errata.yaml
 
 # The exception is the config of the synthetic content repositories under
@@ -18,4 +20,4 @@ errata.yaml
 # added with a rule naming only the clean one, so `git add -A` skipped its
 # config without saying anything and CI failed on a file that looked
 # committed.
-!tests/fixtures/*/errata.yaml
+!tests/fixtures/*/errata.config.yaml

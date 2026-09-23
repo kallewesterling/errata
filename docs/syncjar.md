@@ -31,9 +31,9 @@ COURSE_CONTENT_PATH=~/courses npm run push -- --dry-run
 COURSE_CONTENT_PATH=~/courses npm run push
 ```
 
-`ERRATA_ROOT` points one level deeper than `COURSE_CONTENT_PATH`. It points at the `courses/` directory inside the content repository. This is the layout of this content repository, and neither tool requires it. `contentRoot` in `errata.yaml` records it.
+`ERRATA_ROOT` points one level deeper than `COURSE_CONTENT_PATH`. It points at the `courses/` directory inside the content repository. This is the layout of this content repository, and neither tool requires it. `contentRoot` in `errata.config.yaml` records it.
 
-Setting `ERRATA_ROOT` is also how errata finds its settings. It looks beside that directory and in the directory above it, which is where `errata.yaml` sits.
+Setting `ERRATA_ROOT` is also how errata finds its settings. It looks beside that directory and in the directory above it, which is where `errata.config.yaml` sits.
 
 ## Check the content before you push it
 
@@ -41,11 +41,11 @@ Skilljar is the published site. An error that reaches Skilljar stays in front of
 
 This also matters for `fix:links`. It edits the `href` text where it stands, so `npm run push -- --dry-run` shows you 159 changed URLs instead of 51 files of reformatted markup. Syncjar shows you that diff before it uploads anything.
 
-## Record notes in .errata.yaml, not in the HTML
+## Record notes in .errata-accepted.yaml, not in the HTML
 
 The content goes through the Skilljar editor, and the editor can change the markup. An HTML comment in a lesson can disappear.
 
-Keep your notes in `.errata.yaml` at the content root instead. Syncjar never uploads that file. The documentation export reads only `[A-Z]*/lessons/`, so the export does not collect it either. The file survives the round trip in both directions.
+Keep your notes in `.errata-accepted.yaml` at the content root instead. Syncjar never uploads that file. The documentation export reads only `[A-Z]*/lessons/`, so the export does not collect it either. The file survives the round trip in both directions.
 
 ## Edit a shared lesson
 
