@@ -6,8 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Entries for 0.1.0 were reconstructed from git history after the fact, so they
-group related commits rather than listing each one. That version was never
-tagged; it is the version `package.json` declared while the work landed.
+group related commits rather than listing each one. It was the version
+`package.json` declared while the work landed, and went untagged at the time;
+`v0.1.0` was applied retroactively on 2026-09-23, to the last commit before
+the three-week gap that separates that work from 0.2.0.
 
 ## [0.2.0] — 2026-09-23
 
@@ -369,3 +371,6 @@ tagged; it is the version `package.json` declared while the work landed.
 - The README is written in simplified English, with the reasoning behind each
   check split out into `docs/design.md`. Findings for a particular body of
   content live with that content, not here.
+
+[0.2.0]: https://github.com/kallewesterling/errata/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/kallewesterling/errata/releases/tag/v0.1.0
