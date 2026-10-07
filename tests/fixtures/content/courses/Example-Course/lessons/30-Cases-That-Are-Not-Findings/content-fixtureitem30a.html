@@ -21,3 +21,7 @@ linter
 formatter</code></pre>
 <p>Backticks inside a code block are not stray markup. They are command substitution, drawings, or output captured from a tool that printed them, and rewriting them would change what the reader runs.</p>
 <pre data-lang="console"><code>$ echo "built at `date --iso-8601=seconds`"</code></pre>
+<p>A note inside a file the lesson shows is the file's note, not the lesson's. The template ships with its entrypoint set to TODO, and the reader replaces that value in the next step, so neither the block nor this sentence is unfinished.</p>
+<pre data-lang="yaml"><code># TODO: add the packages your image needs.
+entrypoint: TODO
+packages: []</code></pre>

@@ -284,9 +284,11 @@ export function collectProblems(blocks = getInventory()) {
         "Nothing here is wrong; something here is missing, and no amount of " +
         "reading the repository will supply it. A lesson body that is still " +
         "the word Placeholder, an element holding a note where prose was " +
-        "meant to go, or a description still reading {Short description}. " +
-        "The browser renders a comment as nothing, so the gap is invisible " +
-        "to everyone except whoever opens the source.",
+        "meant to go, a description still reading {Short description}, or " +
+        "an author's note such as TODO: or TO BE ADDED: left in the prose or " +
+        "in a comment. The browser renders a comment as nothing, so the gap " +
+        "is invisible to everyone except whoever opens the source, and a " +
+        "note in the prose is visible to every reader.",
       fix:
         "Write it, or delete the scaffolding if the plan changed. This needs " +
         "the author who owns the course rather than whoever is doing a " +

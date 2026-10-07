@@ -50,9 +50,10 @@ const PLANTED = {
   "unused-lang": 1,
   "markdown-in-prose": 1,
   "flattened-command": 1,
-  // A stub body, an element holding only a comment, and a metadata value
-  // that is still its own template.
-  "unwritten-content": 3,
+  // A stub body, an element holding only a comment, a metadata value that
+  // is still its own template, and one author's note each in the prose and
+  // in a comment.
+  "unwritten-content": 5,
 };
 
 describe("the dirty fixture reports what was planted in it", () => {
