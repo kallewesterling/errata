@@ -531,6 +531,9 @@ export function getUnwritten() {
  * @property {string} context
  * @property {string} editorRef
  * @property {string|null} url
+ * @property {{file: string, offset: number}|null} source
+ *   Where the match starts in lesson HTML, for a rewrite. Null for metadata,
+ *   whose value is escaped JSON and so has no offset in the file to edit.
  */
 
 /**
@@ -589,7 +592,7 @@ export function buildTerminologyInventory() {
     return n === 1 ? id : `${id} (${n})`;
   };
 
-  const report = (base, found, where, editorRef, url) => {
+  const report = (base, found, where, editorRef, url, source = null) => {
     retired.push({
       id: unique(`${base} ${found.term.from}: ${found.context}`),
       fingerprint: fingerprint(found.context),
@@ -599,6 +602,7 @@ export function buildTerminologyInventory() {
       context: found.context,
       editorRef,
       url,
+      source,
     });
   };
 
@@ -680,6 +684,7 @@ export function buildTerminologyInventory() {
             found.where,
             `${relPath}:${line}:${column}`,
             url,
+            { file: relPath, offset: found.offset },
           );
         }
       }

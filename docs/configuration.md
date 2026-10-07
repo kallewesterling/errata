@@ -98,6 +98,8 @@ A published URL slug that carries the old name is reported as `stale`. Do not re
 
 A sentence that is true as dated, such as "In 2025 these were called Chainguard Images", is correct. Accept it in `.errata-accepted.yaml`. The key of the finding contains the sentence, so the entry shows what it accepts.
 
+`npm run fix:terminology` renames the open findings in lesson prose. See [commands.md](commands.md#product-names).
+
 ## Trust a domain
 
 `links.ownedDomains` lists the domains that you control. Errata rewrites a moved link only when the domain is on this list. A redirect from your own site is a decision by a person you can ask. A redirect from another site can be a URL shortener, a test, or a consent page.

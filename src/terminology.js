@@ -227,3 +227,81 @@ export function findRetiredInSlug(slug, compiled) {
     [...slug.matchAll(pattern)].map((m) => ({ term, match: m[0] })),
   );
 }
+
+/** What can stand between two words of a name in the source. */
+const SEPARATOR = new RegExp(String.raw`((?:${GAP.slice(3, -2)}|<[^>]*>)+)`);
+
+const escapeHtml = (text) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * The text to put where a retired name stands, or null when that needs a
+ * person.
+ *
+ * The new name is written as configured, so "chainguard images" becomes
+ * "Chainguard Containers": the casing of a product name is part of the name.
+ * What stood between the words is kept, so a non-breaking space stays one and
+ * "<em>Chainguard</em> Images" keeps its emphasis on the first word.
+ *
+ * When the names have different numbers of words there is no saying which
+ * word an inline tag belonged to, so a match with markup inside it is left
+ * for a person. Without markup, the words are joined by the first separator
+ * the match used.
+ *
+ * @param {string} match  The retired name as it stands in the file.
+ * @param {Term} term
+ * @returns {string|null}
+ */
+export function replacementFor(match, term) {
+  const parts = match.split(SEPARATOR);
+  const separators = parts.filter((_, i) => i % 2 === 1);
+  const to = term.to.trim().split(/\s+/).map(escapeHtml);
+
+  if (to.length === parts.length - separators.length) {
+    return to.map((word, i) => word + (separators[i] ?? "")).join("");
+  }
+  if (separators.some((s) => s.includes("<"))) return null;
+  return to.join(separators[0] ?? " ");
+}
+
+/**
+ * @typedef {object} Rewrite
+ * @property {number} offset   Where the retired name starts in the file.
+ * @property {string} match    The retired name as it stands there.
+ * @property {string} replacement
+ */
+
+/**
+ * Apply rewrites to one file's text, in place and nowhere else.
+ *
+ * The edits replace exactly the characters each finding matched, rather than
+ * regenerating the document: the file goes back to a publishing system, and a
+ * reserialised document is a diff nobody can review. Each edit is checked
+ * against the text before it is made, so one computed against an older copy
+ * of the file is refused rather than applied in the wrong place.
+ *
+ * @template {Rewrite} T
+ * @param {string} html
+ * @param {T[]} rewrites
+ * @returns {{html: string, applied: T[], refused: T[]}}
+ */
+export function applyRewrites(html, rewrites) {
+  const applied = [];
+  const refused = [];
+  let out = html;
+  let floor = Infinity;
+
+  // From the end backwards, so an edit never moves the offset of the next.
+  for (const edit of [...rewrites].sort((a, b) => b.offset - a.offset)) {
+    const end = edit.offset + edit.match.length;
+    if (end > floor || out.slice(edit.offset, end) !== edit.match) {
+      refused.push(edit);
+      continue;
+    }
+    out = out.slice(0, edit.offset) + edit.replacement + out.slice(end);
+    floor = edit.offset;
+    applied.push(edit);
+  }
+
+  return { html: out, applied: applied.reverse(), refused };
+}

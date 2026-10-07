@@ -53,6 +53,31 @@ npm run fix:links -- --dry-run     # Show the changes, but write nothing.
 
 Both commands exit with a non-zero code only for a finding that needs a person.
 
+## Product names
+
+```bash
+npm run fix:terminology                # Rename retired product names in lesson prose.
+npm run fix:terminology -- --dry-run   # Show each change in its sentence, and write nothing.
+```
+
+The names come from the `terminology` setting. See [configuration.md](configuration.md#retire-a-product-name).
+
+`fix:terminology` renames a name only when all of these are true:
+
+- It is an open `retired-term` finding. An accepted finding is a decision, such as a statement that is true as dated.
+- It is in the prose of a lesson HTML file.
+- Any markup between its words still lines up with the new name.
+
+It lists everything else, with the reason:
+
+- A name in code. Check the new command against the tool, then edit the block by hand.
+- A name in a course or lesson title or description. Syncjar pushes a title only with `--force-titles`, so a title is a separate decision.
+- A name in a published slug. Errata never renames a slug.
+
+The new name is written as it is configured, so `chainguard images` becomes `Chainguard Containers`. Errata edits the name where it stands, and does not write the HTML document again.
+
+Run the dry run first, and read every line. A mechanical rename can be wrong for one sentence: a heading such as "Priced by developer tier" can name something else. Accept that finding in `.errata-accepted.yaml`, then run the fix.
+
 ## Copies
 
 ```bash
