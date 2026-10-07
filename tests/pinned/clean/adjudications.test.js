@@ -33,10 +33,10 @@ const blockWith = (text) => {
 describe("the adjudications fixture is intact", () => {
   // Without this, deleting the lesson would make every test below pass by
   // having nothing to check.
-  // Seven, not six: the bare-prompt transcript needs a command above it, or
+  // Eight, not seven: the bare-prompt transcript needs a command above it, or
   // it would be orphaned output and a finding for a different reason.
   it("carries a block for each adjudicated case", () => {
-    expect(blocks).toHaveLength(7);
+    expect(blocks).toHaveLength(8);
   });
 });
 

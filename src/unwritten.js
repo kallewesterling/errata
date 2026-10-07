@@ -12,6 +12,7 @@
  * any one project's wording, so the patterns describe the scaffolding rather
  * than listing the words this content happens to use.
  */
+import { parseFragment } from "parse5";
 
 /**
  * A body that is a note to the author rather than a lesson.
@@ -52,8 +53,61 @@ const COMMENT_ONLY = /<(p|li|h[1-6]|div)\b[^>]*>\s*(<!--[\s\S]*?-->)\s*<\/\1>/gi
 const TEMPLATE_VALUE = /^\{[A-Za-z][\w .-]*\}$/;
 
 /**
+ * A note an author left to themselves, in the middle of a lesson that
+ * otherwise reads as finished.
+ *
+ * The word markers are matched in capitals and only when something marks them
+ * as a note: a colon after, or brackets around. That is the shape a note
+ * takes, and it is what separates `TO BE ADDED: a takeaway` from a sentence
+ * that mentions a template's literal `TODO` value in passing, or a
+ * troubleshooting step headed "Fix:".
+ *
+ * Code blocks are never searched. A lesson that walks through a scaffolded
+ * file shows its `// TODO:` lines on purpose, and those are the file's notes
+ * to its future editor, not the lesson's.
+ */
+const MARKER =
+  /\b(?:TODO|FIXME|FIX|TBD|XXX|PLACEHOLDER|TO BE (?:ADDED|WRITTEN|DONE|CONFIRMED|DECIDED))\s*:|[[(](?:TODO|TBD|FIXME)[\])]|\b[Ll]orem ipsum\b/g;
+
+/** Elements whose text is code, markup, or style rather than prose. */
+const NOT_PROSE = new Set(["pre", "code", "script", "style"]);
+
+/**
+ * The prose a reader sees, one line per text node, and the comments around
+ * it, both without anything inside a code block.
+ *
+ * Separate from the visible text the stub rule reads, because that one keeps
+ * code blocks: a body that is nothing but a code block is not a stub. A
+ * comment inside a block is left out too, because `comment-in-block` already
+ * reports it as a defect of the block.
+ *
+ * @param {string} html
+ */
+function proseAndComments(html) {
+  const prose = [];
+  const comments = [];
+  const walk = (node) => {
+    if (NOT_PROSE.has(node.nodeName)) return;
+    if (node.nodeName === "#text") prose.push(node.value);
+    if (node.nodeName === "#comment") comments.push(node.data);
+    for (const child of node.childNodes ?? []) walk(child);
+  };
+  walk(parseFragment(html));
+  return { prose: prose.join("\n"), comments };
+}
+
+/**
+ * Each marker in a piece of text, shown from the marker onwards so the report
+ * line says what was left unfinished rather than what came before it.
+ *
+ * @param {string} text
+ */
+const markersIn = (text) =>
+  [...text.matchAll(MARKER)].map((m) => text.slice(m.index).split("\n")[0]);
+
+/**
  * @typedef {object} Unwritten
- * @property {"stub-body"|"comment-only"|"template-value"} rule
+ * @property {"stub-body"|"comment-only"|"template-value"|"marker-in-prose"|"marker-in-comment"} rule
  * @property {string} what   Why it reads as unfinished.
  * @property {string} match  The text that showed it, shortened.
  * @property {number} ordinal
@@ -85,13 +139,41 @@ export function findUnwritten(html, visible) {
     });
   }
 
+  const reported = new Set();
   for (const match of html.matchAll(COMMENT_ONLY)) {
+    reported.add(match[2]);
     found.push({
       rule: /** @type {const} */ ("comment-only"),
       what: "an element holding only a comment, where prose was meant to go",
       match: shorten(match[2]),
       ordinal: found.length,
     });
+  }
+
+  const { prose, comments } = proseAndComments(html);
+
+  for (const marker of markersIn(prose)) {
+    found.push({
+      rule: /** @type {const} */ ("marker-in-prose"),
+      what: "an author's note in the prose, which every reader sees",
+      match: shorten(marker),
+      ordinal: found.length,
+    });
+  }
+
+  // A comment is published too: it sits in the page source of every
+  // learner's browser. One already reported as standing in for prose is not
+  // reported a second time for what it says.
+  for (const comment of comments) {
+    if (reported.has(`<!--${comment}-->`)) continue;
+    for (const marker of markersIn(comment)) {
+      found.push({
+        rule: /** @type {const} */ ("marker-in-comment"),
+        what: "an author's note in a comment, which ships in the page source",
+        match: shorten(marker),
+        ordinal: found.length,
+      });
+    }
   }
 
   return found;

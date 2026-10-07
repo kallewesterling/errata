@@ -103,6 +103,61 @@ describe("findUnwritten", () => {
     expect(rules("<p><!-- note -->Real prose here.</p>", "Real prose here.")).toEqual([]);
   });
 
+  it("finds an author's note in the prose", () => {
+    for (const note of [
+      "TO BE ADDED: a quick takeaway",
+      "TODO: explain the flag",
+      "FIX: the command is wrong",
+      "FIXME: broken link",
+      "TBD: which version",
+      "XXX: check this",
+      "The answer is [TBD].",
+      "Lorem ipsum dolor sit amet.",
+    ]) {
+      expect(rules(`<p>Real prose. ${note}</p>`, note), note).toContain("marker-in-prose");
+    }
+  });
+
+  it("decodes entities before reading the prose", () => {
+    const html = "<p>TO BE ADDED: &ldquo;Quick takeaway&rdquo;</p>";
+    expect(findUnwritten(html, "").map((f) => f.match)).toEqual([
+      "TO BE ADDED: “Quick takeaway”",
+    ]);
+  });
+
+  // A lesson can name a template's literal TODO value, or head a
+  // troubleshooting step "Fix:", and mean exactly what it says.
+  it("leaves a mention of a marker alone", () => {
+    for (const text of [
+      "Change the entrypoint from TODO to yq.",
+      "Fix: run the command again with the flag.",
+      "The todo list is empty.",
+    ]) {
+      expect(rules(`<p>${text}</p>`, text), text).toEqual([]);
+    }
+  });
+
+  it("leaves a note inside a code block alone", () => {
+    const html =
+      "<p>The template reads:</p><pre data-lang=\"terraform\"><code>// TODO: Add paths</code></pre>" +
+      "<p>Run <code>sed s/TODO:/done:/</code> on it.</p>";
+    expect(rules(html, "")).toEqual([]);
+  });
+
+  it("finds an author's note in a comment, which is published too", () => {
+    const html = "<p>Real prose.<!-- TODO: add screenshots here --></p>";
+    expect(rules(html, "Real prose.")).toEqual(["marker-in-comment"]);
+  });
+
+  it("reports a comment standing in for prose once, not twice", () => {
+    expect(rules("<p><!-- TODO: insert image --></p>", "")).toEqual(["comment-only"]);
+  });
+
+  it("leaves a comment inside a code block to comment-in-block", () => {
+    const html = "<pre data-lang=\"console\"><code>$ ls\n<!-- TODO: output --></code></pre>";
+    expect(rules(html, "")).toEqual([]);
+  });
+
   it("leaves an ordinary lesson alone", () => {
     const text = "This lesson explains how to sign an artifact and verify the signature.";
     expect(rules(`<p>${text}</p>`, text)).toEqual([]);
