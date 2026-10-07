@@ -13,16 +13,20 @@ the three-week gap that separates that work from 0.2.0.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-07
+
 ### Added
 
 - `unwritten-content` now finds an author's note left in a finished lesson:
-  `TODO:`, `TO BE ADDED:`, `FIX:`, `FIXME:`, `TBD:`, `XXX:`, `[TBD]`, or
-  lorem ipsum. It reads the prose, where every reader sees the note, and the
-  HTML comments, which ship in the page source. It never reads code blocks,
-  because a lesson that shows a scaffolded file shows that file's `// TODO:`
-  lines on purpose. The word markers must be in capitals and followed by a
-  colon, or bracketed, so a sentence that names a template's literal `TODO`
-  value is left alone. The findings report as `unwritten`, at warning severity.
+  `TODO:`, `FIX:`, `FIXME:`, `TBD:`, `XXX:`, `PLACEHOLDER:`, `TO BE ADDED:`
+  (or `WRITTEN`, `DONE`, `CONFIRMED`, `DECIDED`), a bracketed `[TODO]`,
+  `[TBD]` or `[FIXME]`, or lorem ipsum. It reads the prose, where every
+  reader sees the note, and the HTML comments, which ship in the page source.
+  It never reads code blocks, because a lesson that shows a scaffolded file
+  shows that file's `// TODO:` lines on purpose. The word markers must be in
+  capitals and followed by a colon, or bracketed, so a sentence that names a
+  template's literal `TODO` value is left alone. The findings report as
+  `unwritten`, at warning severity.
 
 ## [0.2.0] — 2026-09-23
 
@@ -385,6 +389,7 @@ the three-week gap that separates that work from 0.2.0.
   check split out into `docs/design.md`. Findings for a particular body of
   content live with that content, not here.
 
-[Unreleased]: https://github.com/kallewesterling/errata/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kallewesterling/errata/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kallewesterling/errata/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kallewesterling/errata/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kallewesterling/errata/releases/tag/v0.1.0
