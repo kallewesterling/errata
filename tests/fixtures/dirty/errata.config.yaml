@@ -50,3 +50,13 @@ duplication:
   ignoreElements:
     - script
     - style
+
+# Lesson 40 uses both. Code is read only for the second, so the cosign
+# identity in that lesson stays unreported under either one.
+terminology:
+  - from: Example Images
+    to: Example Containers
+    since: 2026-03
+  - from: examplectl images
+    to: examplectl containers
+    alsoInCode: true

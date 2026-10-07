@@ -54,6 +54,13 @@ const PLANTED = {
   // is still its own template, and one author's note each in the prose and
   // in a comment.
   "unwritten-content": 5,
+  // Lesson 40: the name in its prose, the renamed command in a block whose
+  // term opts in to code, and the name in its title. The cosign identity
+  // and the two separate <code> elements beside it are the traps, and
+  // neither may report.
+  "retired-term": 3,
+  // The same lesson's slug, which carries the name and has to stay.
+  "retired-term-in-url": 1,
 };
 
 describe("the dirty fixture reports what was planted in it", () => {

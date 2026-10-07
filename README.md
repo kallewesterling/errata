@@ -55,6 +55,7 @@ Errata makes an inventory of the content. It then runs the checks against that i
 | Metadata | A path in `lessons-meta.json` that matches no file. A `data-lang` nothing uses. |
 | Pasted code | A curly quote or non-breaking space that breaks in a shell. |
 | Prose | Markdown that never rendered. A command flattened into a sentence. |
+| Product names | A name the product no longer uses, in the prose or a course title. A published URL that still carries one. |
 | Page scripts | An HTML entity inside a `<script>`, which never decodes. |
 | Container images | An image that does not resolve. An image that needs a login. |
 | Links | A dead link. A moved link. A `#anchor` that no longer exists. |

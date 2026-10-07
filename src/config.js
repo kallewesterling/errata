@@ -99,10 +99,19 @@ const TOP_LEVEL_KEYS = new Set([
   "links",
   "driftBudget",
   "duplication",
+  "terminology",
 ]);
 
 /** Settings that may be omitted, with the value used when they are. */
-const OPTIONAL_KEYS = new Map([["nonImageNamespaces", []]]);
+const OPTIONAL_KEYS = new Map([
+  ["nonImageNamespaces", []],
+  ["terminology", []],
+]);
+
+const TERM_KEYS = new Set(["from", "to", "since", "alsoInCode"]);
+
+/** A year, or a year and month: when a name was retired. */
+const SINCE = /^\d{4}(?:-(?:0[1-9]|1[0-2]))?$/;
 
 const KINDS = new Set(["shell", "output", "config", "source"]);
 const PARSERS = new Set(["json", "yaml", "dockerfile", "hcl"]);
@@ -214,6 +223,38 @@ function validate(raw) {
     dup.ignoreElements.some((e) => typeof e !== "string")
   ) {
     fail("duplication.ignoreElements must be a list of element names");
+  }
+
+  if (!Array.isArray(raw.terminology)) fail("terminology must be a list");
+  const retired = new Set();
+  for (const [i, term] of raw.terminology.entries()) {
+    const at = `terminology[${i}]`;
+    if (!term || typeof term !== "object") fail(`${at} must be a mapping`);
+    for (const key of Object.keys(term)) {
+      if (!TERM_KEYS.has(key)) {
+        fail(`${at} has unknown key "${key}". Expected one of: ${[...TERM_KEYS].join(", ")}`);
+      }
+    }
+    if (typeof term.from !== "string" || !term.from.trim()) {
+      fail(`${at}.from must be the retired name`);
+    }
+    if (typeof term.to !== "string" || !term.to.trim()) {
+      fail(`${at}.to must be the current name`);
+    }
+    // YAML reads `since: 2026` as a number and `since: 2026-03` as a string,
+    // and both mean what they say.
+    if (typeof term.since === "number") term.since = String(term.since);
+    if (term.since !== undefined && !SINCE.test(term.since)) {
+      fail(`${at}.since must be a year or a year and month, such as 2026-03`);
+    }
+    if (term.alsoInCode !== undefined && typeof term.alsoInCode !== "boolean") {
+      fail(`${at}.alsoInCode must be true or false`);
+    }
+    // Matching ignores case, so two entries differing only in case would
+    // report every instance twice with possibly different replacements.
+    const name = term.from.trim().toLowerCase().replace(/\s+/g, " ");
+    if (retired.has(name)) fail(`${at}.from repeats "${term.from}"`);
+    retired.add(name);
   }
 
   return raw;
@@ -345,6 +386,18 @@ export const duplication = Object.freeze({
   ...config.duplication,
   ignoreElements: Object.freeze(new Set(config.duplication.ignoreElements)),
 });
+
+/**
+ * Product names the content should no longer use, and what replaced them.
+ *
+ * The list belongs to the content, like `privateImages.allowedCourses`: which
+ * names a product retired is a fact about one catalogue, not about errata.
+ *
+ * @type {readonly import("./terminology.js").Term[]}
+ */
+export const terminology = Object.freeze(
+  config.terminology.map((term) => Object.freeze({ ...term })),
+);
 
 /**
  * The known-issues file, resolved against the content root rather than this

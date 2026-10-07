@@ -1,0 +1,7 @@
+<h2>Using the old product name</h2>
+<p>This lesson still calls the product Example Images, which is the one retired-term finding in its prose.</p>
+<p>The <code>examplectl</code> tool can compare two containers with its <code>images diff</code> subcommand. Those are two code elements, and read together they are not the retired command.</p>
+<p>List what the registry holds. The command was renamed, and this term opts in to code.</p>
+<pre data-lang="console"><code>$ examplectl images list</code></pre>
+<p>Verify the signature. The identity is the organisation that signed the artifact, so it must keep its old name, and nothing here reports it.</p>
+<pre data-lang="console"><code>$ cosign verify --certificate-identity=https://github.com/example-images/images/.github/workflows/release.yaml@refs/heads/main registry.example.com/example/app</code></pre>

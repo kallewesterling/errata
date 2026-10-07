@@ -69,6 +69,35 @@ privateImages:
 
 Errata checks this list in two directions. A course on the list that uses no private image also fails. An entry cannot outlive its reason.
 
+## Retire a product name
+
+When a product is renamed, list the old name in `terminology`. Errata then reports the old name wherever a reader sees it:
+
+```yaml
+terminology:
+  - from: Chainguard Images
+    to: Chainguard Containers
+    since: 2026-03
+  - from: Chainguard Image
+    to: Chainguard Container
+  - from: chainctl images
+    to: chainctl containers
+    alsoInCode: true
+```
+
+- `from` is the old name. Errata ignores case and the line breaks in the HTML. It does not match a singular inside its plural, so list both forms if both were renamed.
+- `to` is the new name.
+- `since` is optional. It is a year, or a year and month, and appears in the report.
+- `alsoInCode` is optional. Without it, errata does not read code blocks or `<code>` for this name.
+
+Errata reads the lesson prose, the course title and descriptions, and the lesson titles. These findings are `defect`.
+
+Errata does not read code by default, because a name in code is usually an identifier. The GitHub organisation `chainguard-images` is in every `cosign verify` command, and it must match what signed the artifact. Set `alsoInCode` only when a command really changed.
+
+A published URL slug that carries the old name is reported as `stale`. Do not rename the slug. Every link to the old URL would break. Accept the finding in `.errata-accepted.yaml`.
+
+A sentence that is true as dated, such as "In 2025 these were called Chainguard Images", is correct. Accept it in `.errata-accepted.yaml`. The key of the finding contains the sentence, so the entry shows what it accepts.
+
 ## Trust a domain
 
 `links.ownedDomains` lists the domains that you control. Errata rewrites a moved link only when the domain is on this list. A redirect from your own site is a decision by a person you can ask. A redirect from another site can be a URL shortener, a test, or a consent page.

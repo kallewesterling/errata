@@ -1,16 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
-import { duplication, repoRoot } from "./config.js";
+import { duplication, primaryDomain, repoRoot, terminology } from "./config.js";
 import { classify } from "./classify.js";
 import { sentences, shingles, visibleText, words } from "./duplication.js";
 import { extractBlocks, fingerprint } from "./extract.js";
 import { extractInlineCode } from "./inline-code.js";
 import { resolveContentFile } from "./integrity.js";
-import { lessonUrl, loadCourses } from "./mirror.js";
+import { READER_FIELDS, lessonUrl, loadCourses } from "./mirror.js";
 import { linkBlocks } from "./pairing.js";
 import { findProseDefects } from "./prose-defects.js";
 import { extractImages, extractLinks } from "./prose-links.js";
 import { extractScriptEntities } from "./scripts.js";
+import { compileTerms, findRetiredInSlug, findRetiredTerms } from "./terminology.js";
 import { findTemplateValues, findUnwritten } from "./unwritten.js";
 import { collectWarnings } from "./warnings.js";
 
@@ -518,4 +519,179 @@ let cachedUnwritten = null;
 export function getUnwritten() {
   cachedUnwritten ??= buildUnwrittenInventory();
   return cachedUnwritten;
+}
+
+/**
+ * @typedef {object} RetiredTermItem
+ * @property {string} id           Where it is, then the term and the words around it.
+ * @property {string} fingerprint
+ * @property {import("./terminology.js").Term} term
+ * @property {"prose"|"code"|"metadata"} where
+ * @property {string} match
+ * @property {string} context
+ * @property {string} editorRef
+ * @property {string|null} url
+ */
+
+/**
+ * @typedef {object} RetiredSlugItem
+ * @property {string} id
+ * @property {string} fingerprint
+ * @property {import("./terminology.js").Term} term
+ * @property {string} slug
+ * @property {string} editorRef
+ * @property {string|null} url
+ */
+
+/** Line and column of an offset, counted the way an editor counts them. */
+function lineAndColumn(text, offset) {
+  const before = text.slice(0, offset);
+  return {
+    line: before.split("\n").length,
+    column: offset - (before.lastIndexOf("\n") + 1) + 1,
+  };
+}
+
+/**
+ * Build the inventory of retired product names.
+ *
+ * Two populations, reported apart because they want opposite handling. Text
+ * a reader sees — lesson prose, course and lesson titles and descriptions,
+ * and code for a term that asks — is to be renamed. A published slug is
+ * residue that has to stay, because renaming it breaks every link to it.
+ *
+ * `course-urls.json` is not read for slugs. It is an index built from the
+ * same `published.json` slug, so reading both reports one URL twice.
+ *
+ * A text finding is identified by the words around it rather than by its
+ * position among the others. The renames are mechanical and many, and the
+ * acceptances few: a dated statement such as "in 2025 these were called
+ * Chainguard Images". Identity by ordinal would shift every acceptance after
+ * the first occurrence somebody fixed, and the known-issues file would then
+ * call a deliberate decision resolved. Identity by context leaves it where it
+ * is, and reads as the sentence it accepts.
+ *
+ * @returns {{retired: RetiredTermItem[], slugs: RetiredSlugItem[]}}
+ */
+export function buildTerminologyInventory() {
+  const compiled = compileTerms(terminology);
+  /** @type {RetiredTermItem[]} */
+  const retired = [];
+  /** @type {RetiredSlugItem[]} */
+  const slugs = [];
+  if (compiled.length === 0) return { retired, slugs };
+
+  const seen = new Map();
+  /** Keep two identical sentences in one file from sharing a key. */
+  const unique = (id) => {
+    const n = (seen.get(id) ?? 0) + 1;
+    seen.set(id, n);
+    return n === 1 ? id : `${id} (${n})`;
+  };
+
+  const report = (base, found, where, editorRef, url) => {
+    retired.push({
+      id: unique(`${base} ${found.term.from}: ${found.context}`),
+      fingerprint: fingerprint(found.context),
+      term: found.term,
+      where,
+      match: found.match,
+      context: found.context,
+      editorRef,
+      url,
+    });
+  };
+
+  /** The line in a JSON file where a field's value sits. */
+  const lineInJson = (raw, value) => {
+    const at = raw.indexOf(JSON.stringify(value));
+    return at < 0 ? 1 : lineAndColumn(raw, at).line;
+  };
+
+  for (const course of loadCourses()) {
+    const readRaw = (name) => {
+      const file = path.join(course.absPath, name);
+      return fs.existsSync(file)
+        ? { rel: path.relative(repoRoot, file), raw: fs.readFileSync(file, "utf8") }
+        : null;
+    };
+
+    const details = readRaw("details.json");
+    for (const field of READER_FIELDS["details.json"]) {
+      const value = course.details[field];
+      if (typeof value !== "string" || !details) continue;
+      const ref = `${details.rel}:${lineInJson(details.raw, value)}:1`;
+      for (const found of findRetiredTerms(value, compiled)) {
+        report(`${course.dir}/details.json#${field}`, found, "metadata", ref, course.url);
+      }
+    }
+
+    const published = readRaw("published.json");
+    for (const [domain, slug] of Object.entries(course.slugs)) {
+      for (const found of findRetiredInSlug(slug, compiled)) {
+        slugs.push({
+          id: `${course.dir}/published.json#domains.${domain}.slug ${found.term.from}`,
+          fingerprint: fingerprint(slug),
+          term: found.term,
+          slug,
+          editorRef: `${published?.rel}:${published ? lineInJson(published.raw, slug) : 1}:1`,
+          url: domain === primaryDomain ? course.url : null,
+        });
+      }
+    }
+
+    const meta = readRaw("lessons-meta.json");
+    for (const lesson of course.lessons) {
+      const url = lessonUrl(course, lesson);
+      const base = `${course.dir}/${lesson.slug}/${lesson.id}`;
+
+      for (const field of READER_FIELDS["lessons-meta.json"]) {
+        const value = lesson[field];
+        if (typeof value !== "string" || !value || !meta) continue;
+        const ref = `${meta.rel}:${lineInJson(meta.raw, value)}:1`;
+        for (const found of findRetiredTerms(value, compiled)) {
+          report(`${base}#${field}`, found, "metadata", ref, url);
+        }
+      }
+
+      for (const found of findRetiredInSlug(lesson.slug, compiled)) {
+        slugs.push({
+          id: `${base}#slug ${found.term.from}`,
+          fingerprint: fingerprint(lesson.slug),
+          term: found.term,
+          slug: lesson.slug,
+          editorRef: `${meta?.rel}:${meta ? lineInJson(meta.raw, lesson.slug) : 1}:1`,
+          url,
+        });
+      }
+
+      for (const item of lesson.content_items ?? []) {
+        const absFile = resolveContentFile(course.absPath, item.file);
+        if (!absFile) continue;
+
+        const html = fs.readFileSync(absFile, "utf8");
+        const relPath = path.relative(repoRoot, absFile);
+
+        for (const found of findRetiredTerms(html, compiled)) {
+          const { line, column } = lineAndColumn(html, found.offset);
+          report(
+            `${course.dir}/${lesson.slug}/${item.id}#term`,
+            found,
+            found.where,
+            `${relPath}:${line}:${column}`,
+            url,
+          );
+        }
+      }
+    }
+  }
+
+  return { retired, slugs };
+}
+
+let cachedTerminology = null;
+/** Memoized inventory of retired product names. */
+export function getTerminology() {
+  cachedTerminology ??= buildTerminologyInventory();
+  return cachedTerminology;
 }

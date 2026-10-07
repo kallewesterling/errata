@@ -28,5 +28,15 @@
     "content_items": [
       { "id": "dirtyitem30a", "file": "lessons/30-Unwritten-Lesson/content-dirtyitem30a.html", "order": 1 }
     ]
+  },
+  {
+    "id": "dirtylesson40",
+    "slug": "40-Retired-Example-Images",
+    "title": "Retired Example Images",
+    "order": 40,
+    "description_html": "",
+    "content_items": [
+      { "id": "dirtyitem40a", "file": "lessons/40-Retired-Example-Images/content-dirtyitem40a.html", "order": 1 }
+    ]
   }
 ]

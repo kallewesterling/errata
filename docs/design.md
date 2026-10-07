@@ -238,6 +238,26 @@ A block earns a place in the map when it carries detail that can rot. It must ha
 
 The command `$ apk update` appears in four courses and does not matter, because it holds nothing that can get out of date. The command `$ curl -o chainctl "https://dl.enforce.dev/chainctl/latest/..."` appears in three courses and matters a lot.
 
+## How errata reads product names
+
+### The same name means three things
+
+The list of retired names belongs to the content, like the other settings. Errata carries only the mechanism, and the mechanism is mostly about where the name is.
+
+In prose, the reader sees a retired name, so it is a `defect`. In code, a name is usually an identifier. The courses this was written against carry `chainguard-images` 163 times inside lesson HTML, most of it the GitHub organisation in a `cosign verify --certificate-identity`. That identity has to match what signed the artifact, so renaming it would break every verification command in the catalogue. Code is therefore read only for a term marked `alsoInCode`. In a published slug, the name is real residue, but renaming the slug breaks every link to it, so it is `stale` and never edited.
+
+`course-urls.json` is not read for slugs. It is built from the same `published.json` slug, so reading both reports one URL twice.
+
+### A finding is named by its sentence
+
+Most findings are named by their position: the second instance in a lesson is `#2`. That does not work here. The renames are many and mechanical, and the acceptances few: a dated statement such as "In 2025 these were called Chainguard Images". If the first instance in a lesson is renamed, every later one moves up by one, and an acceptance named by position stops matching. Errata would then call a deliberate decision resolved.
+
+A retired-name finding is named by the words around it instead. Renaming another instance does not move it, and the entry in `.errata-accepted.yaml` reads as the sentence it accepts. Editing that sentence does change the name, so the old entry is reported as resolved and the new sentence as open, in the same run.
+
+### What the scan blanks, and how
+
+The scan blanks what it does not read, and keeps every offset, so a finding points at a real line and column. There are two kinds of blank. An inline tag is transparent: "Chainguard <strong>Images</strong>" is the name. A code element, a comment, a script, and a block-level tag are walls that a name cannot cross. Without the walls, two `<code>` elements in one sentence, `chainctl` and `images diff`, read as `chainctl images` once the prose between them is blanked.
+
 ## How errata reports
 
 ### A category is not a severity
@@ -348,7 +368,7 @@ For the courses this was built against, that record is `docs/errata-findings.md`
 in the content repository. To produce your own, run `npm run inventory --
 --problems --all`, `npm run check:links` and `npm run check:copies`.
 
-Six results are worth keeping here, because they changed errata itself rather
+Seven results are worth keeping here, because they changed errata itself rather
 than the content. Each is a case that looks like a defect to a rule that has
 not been told otherwise, and each was settled once against real content:
 
@@ -368,6 +388,11 @@ not been told otherwise, and each was settled once against real content:
 - **Backticks inside a `<pre>` are not stray markup.** There they are command
   substitution, ASCII art, or output captured from a tool that printed them.
   Only backticks outside a `<pre>` are a Markdown leftover.
+- **Two code elements are not one command.** A sentence that names
+  `<code>chainctl</code>` and later its `<code>images diff</code>` feature
+  read as the retired `chainctl images` once the prose between them was
+  blanked, and "a Chainguard <code>-dev</code> image" read as "Chainguard
+  image". Blanked code is now a wall that a name cannot cross.
 
 Two thirds of the first "promptless shell block" findings were faults in errata,
 not in the content. Only real content shows that.
