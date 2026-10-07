@@ -13,6 +13,19 @@ the three-week gap that separates that work from 0.2.0.
 
 ## [Unreleased]
 
+### Added
+
+- `retired-term` reports a product name that has been retired, wherever a
+  reader sees it: the lesson prose, the course title and descriptions, and the
+  lesson titles. The names come from a new optional `terminology` setting,
+  each with the name that replaced it. Code blocks and `<code>` are not read
+  unless a term sets `alsoInCode`, because a name in code is usually an
+  identifier: the `chainguard-images` organisation in a `cosign` certificate
+  identity has to match what signed the artifact.
+- `retired-term-in-url` reports a published course or lesson slug that carries
+  a retired name, as `stale`. Renaming a slug breaks every link to it, so this
+  is reported to be known about rather than changed.
+
 ## [0.3.0] — 2026-10-07
 
 ### Added

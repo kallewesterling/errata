@@ -267,6 +267,53 @@ describe("configuration validation", () => {
     expect(result.stderr).toContain("nonImageNamespaces must be a list");
   });
 
+  describe("terminology", () => {
+    const withTerms = (yaml) => loadConfig(`${VALID}\nterminology:\n${yaml}`);
+
+    it("is optional", () => {
+      expect(VALID).not.toContain("terminology");
+      expect(loadConfig(VALID).ok).toBe(true);
+    });
+
+    it("accepts a term with every setting", () => {
+      const result = withTerms(
+        "  - { from: Chainguard Images, to: Chainguard Containers, since: 2026-03, alsoInCode: false }\n" +
+          "  - { from: Developer tier, to: Catalog Starter, since: 2026 }\n",
+      );
+      expect(result.ok, result.stderr).toBe(true);
+    });
+
+    it("rejects an unknown key in a term, rather than ignoring it", () => {
+      const result = withTerms("  - { from: A B, to: C D, inCode: true }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain('terminology[0] has unknown key "inCode"');
+    });
+
+    it("rejects a term with no replacement", () => {
+      const result = withTerms("  - { from: A B }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain("terminology[0].to");
+    });
+
+    it("rejects a date that is not a year or a month", () => {
+      const result = withTerms("  - { from: A B, to: C D, since: March 2026 }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain("terminology[0].since");
+    });
+
+    it("rejects alsoInCode that is not a boolean", () => {
+      const result = withTerms("  - { from: A B, to: C D, alsoInCode: yes please }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain("terminology[0].alsoInCode");
+    });
+
+    it("rejects a name listed twice, since matching ignores case", () => {
+      const result = withTerms("  - { from: Chainguard Images, to: X }\n  - { from: chainguard  images, to: Y }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain('terminology[1].from repeats "chainguard  images"');
+    });
+  });
+
   it("rejects an unknown language kind", () => {
     const result = loadConfig(VALID.replace("console: { kind: shell }", "console: { kind: runnable }"));
     expect(result.ok).toBe(false);

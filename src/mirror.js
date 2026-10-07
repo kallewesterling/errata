@@ -23,6 +23,7 @@ import { contentRoot, primaryDomain } from "./config.js";
  * @property {string} slug
  * @property {string} title
  * @property {number} order
+ * @property {string} [description_html]
  * @property {ContentItem[]} content_items
  */
 
@@ -34,8 +35,22 @@ import { contentRoot, primaryDomain } from "./config.js";
  * @property {string} title
  * @property {string|null} url  Public course URL, when one is known.
  * @property {string|null} publishedSlug
+ * @property {Record<string, string>} slugs  Published slug on every domain.
+ * @property {Record<string, unknown>} details  The course's details.json.
  * @property {Lesson[]} lessons
  */
+
+/**
+ * Metadata fields a learner reads as text, as distinct from identifiers.
+ *
+ * A course title and description are shown on the course page and a lesson
+ * title in the navigation, so a defect in one is a defect in prose. The rest
+ * of each file is ids, flags, timestamps and file paths that no reader sees.
+ */
+export const READER_FIELDS = Object.freeze({
+  "details.json": Object.freeze(["title", "short_description", "long_description_html"]),
+  "lessons-meta.json": Object.freeze(["title", "description_html"]),
+});
 
 function readJson(file) {
   try {
@@ -83,6 +98,12 @@ function loadCourse(dir, urls) {
     title: details?.title ?? dir,
     url: urls[dir] ?? null,
     publishedSlug: published?.domains?.[primaryDomain]?.slug ?? null,
+    slugs: Object.fromEntries(
+      Object.entries(published?.domains ?? {})
+        .filter(([, domain]) => typeof domain?.slug === "string")
+        .map(([name, domain]) => [name, domain.slug]),
+    ),
+    details: details ?? {},
     lessons,
   };
 }

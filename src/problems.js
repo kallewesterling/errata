@@ -22,6 +22,7 @@ import {
   getInventory,
   getProseDefects,
   getScriptEntities,
+  getTerminology,
   getUnwritten,
 } from "./inventory.js";
 import {
@@ -103,6 +104,7 @@ export function collectProblems(blocks = getInventory()) {
   const inlineCode = getInlineCode();
   const proseDefects = getProseDefects();
   const unwritten = getUnwritten();
+  const retired = getTerminology();
   const unusedLangs = knownLangs.filter(
     (lang) => !blocks.some((block) => block.lang === lang),
   );
@@ -425,6 +427,59 @@ export function collectProblems(blocks = getInventory()) {
           details: [["suspected because", defect.what]],
           locations: [blockLocation(defect)],
         })),
+    },
+    {
+      id: "retired-term",
+      category: "defect",
+      title: "product names that have since been retired",
+      why:
+        "The reader sees a name the product no longer goes by, and nothing " +
+        "else here can notice: a renamed product breaks no link, no parser " +
+        "and no command. The names come from the terminology setting in " +
+        `${configFile}. A code block is read only for a term marked ` +
+        "alsoInCode, because a name in code is usually an identifier that " +
+        "has to stay as it is.",
+      fix:
+        "Use the current name. A statement that is true as dated, such as " +
+        "what the product was called in a given year, is correct: accept it " +
+        "in the known-issues file with that as the reason.",
+      items: retired.retired.map((found) => ({
+        summary: `${style.bad(found.context)}  ${style.muted(found.id.split("#")[0])}`,
+        key: found.id,
+        fingerprint: found.fingerprint,
+        details: [
+          ["retired", found.term.from],
+          ["now", found.term.to],
+          ...(found.term.since ? [["since", found.term.since]] : []),
+          ["in", found.where],
+        ],
+        locations: [blockLocation(found)],
+      })),
+    },
+    {
+      id: "retired-term-in-url",
+      category: "stale",
+      severity: "warning",
+      title: "published URLs that carry a retired product name",
+      why:
+        "The slug was right when the course or lesson was published, and is " +
+        "residue now. It is reported so it is known about, not so it is " +
+        "changed: every existing link, bookmark and search result points at " +
+        "this URL, and renaming the slug breaks all of them.",
+      fix:
+        "Leave it, and accept it in the known-issues file, unless the slug " +
+        "is being changed on purpose with redirects from the old URL in " +
+        "place first.",
+      items: retired.slugs.map((found) => ({
+        summary: `${style.bad(found.slug)}  ${style.muted(found.id.split("#")[0])}`,
+        key: found.id,
+        fingerprint: found.fingerprint,
+        details: [
+          ["retired", found.term.from],
+          ["now", found.term.to],
+        ],
+        locations: [blockLocation(found)],
+      })),
     },
     {
       id: "prompted-output",

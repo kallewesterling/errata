@@ -141,6 +141,28 @@ driftBudget:
   # Digest-pinned references older than staleImageDays.
   staleImageRefs: 0
 
+# Product names that were retired, and what replaced them. Optional.
+#
+# Errata reports the old name in the lesson prose and in the course and lesson
+# titles and descriptions. It does not read code unless a term sets
+# alsoInCode, because a name in code is usually an identifier: the
+# chainguard-images organisation in a cosign certificate identity has to match
+# what signed the artifact. A published slug that carries the old name is
+# reported as stale, never as something to edit, because renaming it breaks
+# every link to it.
+#
+# Matching ignores case and line breaks, and a singular never matches inside
+# its plural, so list both if both were renamed.
+terminology:
+  - from: Example Images
+    to: Example Containers
+    # A year, or a year and month. Shown in the report.
+    since: 2026-03
+  - from: examplectl images
+    to: examplectl containers
+    # The command itself was renamed, so code blocks are read for this one.
+    alsoInCode: true
+
 # Lessons that are copies of each other.
 #
 # Reuse is often deliberate, so repetition is not the finding. Two copies that
