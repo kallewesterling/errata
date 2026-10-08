@@ -13,6 +13,8 @@ the three-week gap that separates that work from 0.2.0.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-08
+
 ### Added
 
 - `retired-term` reports a product name that has been retired, wherever a
@@ -410,7 +412,8 @@ the three-week gap that separates that work from 0.2.0.
   check split out into `docs/design.md`. Findings for a particular body of
   content live with that content, not here.
 
-[Unreleased]: https://github.com/kallewesterling/errata/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kallewesterling/errata/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kallewesterling/errata/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kallewesterling/errata/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kallewesterling/errata/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kallewesterling/errata/releases/tag/v0.1.0
