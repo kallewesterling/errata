@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyRewrites,
   codeOf,
   compileTerms,
   findRetiredInSlug,
   findRetiredTerms,
   proseOf,
+  replacementFor,
 } from "../../src/terminology.js";
 
 const TERMS = compileTerms([
@@ -157,5 +159,62 @@ describe("findRetiredInSlug", () => {
 
   it("finds nothing in an unrelated slug", () => {
     expect(slug("chainguard-containers-crash-course")).toEqual([]);
+  });
+});
+
+describe("replacementFor", () => {
+  const images = { from: "Chainguard Images", to: "Chainguard Containers" };
+
+  it("writes the new name as configured, since its casing is part of it", () => {
+    expect(replacementFor("chainguard images", images)).toBe("Chainguard Containers");
+  });
+
+  it("keeps a non-breaking space and a line break where they stood", () => {
+    expect(replacementFor("Chainguard&nbsp;Images", images)).toBe("Chainguard&nbsp;Containers");
+    expect(replacementFor("Chainguard\n  Images", images)).toBe("Chainguard\n  Containers");
+  });
+
+  it("keeps an inline tag on the word it belonged to", () => {
+    expect(replacementFor("Chainguard</em> Images", images)).toBe("Chainguard</em> Containers");
+  });
+
+  it("joins a longer name with the separator the match used", () => {
+    expect(replacementFor("Developer&nbsp;tier", { from: "Developer tier", to: "Catalog Starter plan" })).toBe(
+      "Catalog&nbsp;Starter&nbsp;plan",
+    );
+  });
+
+  it("leaves markup for a person when the word counts differ", () => {
+    expect(replacementFor("Developer <b>tier", { from: "Developer tier", to: "Catalog Starter plan" })).toBe(null);
+  });
+
+  it("escapes the new name for HTML", () => {
+    expect(replacementFor("Old Name", { from: "Old Name", to: "Q&A <Tool>" })).toBe("Q&amp;A &lt;Tool&gt;");
+  });
+});
+
+describe("applyRewrites", () => {
+  const html = "<p>Chainguard Images, and more Chainguard Images.</p>";
+  const at = (offset) => ({ offset, match: "Chainguard Images", replacement: "Chainguard Containers" });
+
+  it("replaces exactly the characters matched, and nothing else", () => {
+    const { html: out, applied } = applyRewrites(html, [at(3), at(html.lastIndexOf("Chainguard"))]);
+    expect(out).toBe("<p>Chainguard Containers, and more Chainguard Containers.</p>");
+    expect(applied).toHaveLength(2);
+  });
+
+  it("refuses an edit computed against a different copy of the file", () => {
+    const { html: out, refused } = applyRewrites(html, [at(4)]);
+    expect(out).toBe(html);
+    expect(refused).toHaveLength(1);
+  });
+
+  it("refuses an edit overlapping one already made", () => {
+    const { applied, refused } = applyRewrites(html, [
+      at(3),
+      { offset: 14, match: "Images", replacement: "Containers" },
+    ]);
+    expect(applied.map((e) => e.offset)).toEqual([14]);
+    expect(refused.map((e) => e.offset)).toEqual([3]);
   });
 });

@@ -23,6 +23,8 @@ npm run check:links           # Every link and image, against the live web.
 # 3. Repair. Some of the work is mechanical.
 npm run fix:links -- --dry-run
 npm run fix:links
+npm run fix:terminology -- --dry-run
+npm run fix:terminology
 
 # 4. Check again, then send the content back.
 npm run test:offline

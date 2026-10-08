@@ -25,6 +25,14 @@ the three-week gap that separates that work from 0.2.0.
 - `retired-term-in-url` reports a published course or lesson slug that carries
   a retired name, as `stale`. Renaming a slug breaks every link to it, so this
   is reported to be known about rather than changed.
+- `npm run fix:terminology` renames the open `retired-term` findings in lesson
+  prose, in place, and `-- --dry-run` shows each change in its sentence. It
+  skips an accepted finding, so a statement that is true as dated survives.
+  It lists, with the reason, what it leaves for a person: a name in code,
+  where the new command needs checking against the tool; a title or
+  description, which Syncjar pushes behind its own flag; markup between the
+  words that no longer lines up with the new name; and a published slug,
+  which it never renames.
 
 ## [0.3.0] — 2026-10-07
 
