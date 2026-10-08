@@ -169,6 +169,8 @@ When the name does change, errata holds the link back if the destination is an a
 
 Errata does not count how many links share a destination. After a site reorganization, several old addresses correctly resolve to one new page. An earlier version treated that as suspicious, and it held back the links that most needed a repair.
 
+There is one exception, and it is narrow. A resource card that a script builds is a tile on the page, not a sentence. If two cards in one list would point at the same page after a rewrite, the page shows two tiles for one page, under titles that no longer describe it. Errata holds those back. This is a question about where the link sits, not about the URL, so it is not part of the verdict: one URL can collide in one widget and be safe everywhere else. Against the content this was written against, it holds 12 of 80 moved card links, in 4 files. Every one of the 12 was a real collision between different pages.
+
 On the current content, errata rewrites 101 links and holds 8 for a person. Each of those 8 is a real decision. They include:
 
 - a retired comparison page, swept into its section index

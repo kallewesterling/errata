@@ -58,7 +58,7 @@ Errata makes an inventory of the content. It then runs the checks against that i
 | Product names | A name the product no longer uses, in the prose or a course title. A published URL that still carries one. |
 | Page scripts | An HTML entity inside a `<script>`, which never decodes. |
 | Container images | An image that does not resolve. An image that needs a login. |
-| Links | A dead link. A moved link. A `#anchor` that no longer exists. |
+| Links | A dead link. A moved link. A `#anchor` that no longer exists. A link on a resource card that a script builds, when you turn that on. |
 | Images | An `<img src>` that does not load. |
 | Copies | Two lessons that were identical, and now differ. A finding in one copy but not its twin. |
 | Unwritten | A lesson body that is still a placeholder. A description still reading `{Short description}`. A `TODO:` or `TO BE ADDED:` left in the prose or a comment. |

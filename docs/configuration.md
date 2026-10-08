@@ -107,3 +107,33 @@ A sentence that is true as dated, such as "In 2025 these were called Chainguard 
 Errata matches the registrable domain. Every subdomain of `example.com` qualifies. The domain `notexample.com` does not.
 
 `links.ownedDomains` is not the same setting as `primaryDomain`. `primaryDomain` names the one site that supplies the public lesson URLs.
+
+## Check the links on resource cards
+
+Some themes build a list of cards from an object in an inline `<script>`, and turn each card's `link` into a link on the page:
+
+```html
+<script>
+  const resources = {
+    resources: [
+      { title: "Getting started guide", link: "https://docs.example.com/start" },
+    ],
+  };
+</script>
+```
+
+The reader sees a link, but the file has no `<a href>` for errata to find. Name the property that holds the URL in `links.scriptLinks`:
+
+```yaml
+links:
+  scriptLinks:
+    keys: [link]
+    # Optional. The property that names the card in a report. The default is title.
+    textKey: title
+```
+
+The setting is off when it is absent. Errata then reads no script, and nothing changes.
+
+When it is set, errata reads each inline script with a JavaScript parser. It skips comments, so a template object that is commented out is not checked. It reads only a string value, not one that the script builds. It does not decode an HTML entity, because a script is raw text: `&amp;` reaches the reader as five characters.
+
+`check:links` checks these links like any other link. `fix:links` rewrites one where it stands, as `link: "new"`, and does not write the script again. It does not rewrite two cards in the same list that would point at the same page afterwards. That would give the page two cards for one page, so errata reports them for a person.

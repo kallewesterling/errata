@@ -131,6 +131,18 @@ links:
     - pattern: '^https?://localhost'
       why: Only resolvable on the reader's own machine.
 
+  # Optional. Links on resource cards that a theme builds from an object in an
+  # inline <script>, such as { title: "Guide", link: "https://..." }. Name the
+  # properties that hold a URL. Without this setting, errata reads no script.
+  #
+  # Scripts are read with a JavaScript parser, so a commented-out template is
+  # skipped. fix:links rewrites a card's link where it stands, except when two
+  # cards in one list would then point at the same page.
+  scriptLinks:
+    keys: [link]
+    # The property that names a card in a report. Defaults to title.
+    textKey: title
+
 # Ceilings for measurements that move without anybody touching the content.
 #
 # These are the one case a known-issues entry cannot express. An entry pins the

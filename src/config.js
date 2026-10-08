@@ -110,6 +110,9 @@ const OPTIONAL_KEYS = new Map([
 
 const TERM_KEYS = new Set(["from", "to", "since", "alsoInCode"]);
 
+const LINK_KEYS = new Set(["ownedDomains", "skip", "scriptLinks"]);
+const SCRIPT_LINK_KEYS = new Set(["keys", "textKey"]);
+
 /** A year, or a year and month: when a name was retired. */
 const SINCE = /^\d{4}(?:-(?:0[1-9]|1[0-2]))?$/;
 
@@ -185,6 +188,13 @@ function validate(raw) {
     fail("links.ownedDomains must be a non-empty list of domain names");
   }
 
+  if (!raw.links || typeof raw.links !== "object") fail("links must be a mapping");
+  for (const key of Object.keys(raw.links)) {
+    if (!LINK_KEYS.has(key)) {
+      fail(`unknown setting "links.${key}". Expected one of: ${[...LINK_KEYS].join(", ")}`);
+    }
+  }
+
   if (!Array.isArray(raw.links?.skip)) fail("links.skip must be a list");
   for (const [i, entry] of raw.links.skip.entries()) {
     if (!entry || typeof entry.pattern !== "string" || typeof entry.why !== "string") {
@@ -194,6 +204,31 @@ function validate(raw) {
       new RegExp(entry.pattern);
     } catch (err) {
       fail(`links.skip[${i}].pattern is not a valid regular expression: ${err.message}`);
+    }
+  }
+
+  const scripted = raw.links.scriptLinks;
+  if (scripted !== undefined) {
+    if (!scripted || typeof scripted !== "object" || Array.isArray(scripted)) {
+      fail("links.scriptLinks must be a mapping");
+    }
+    for (const key of Object.keys(scripted)) {
+      if (!SCRIPT_LINK_KEYS.has(key)) {
+        fail(
+          `links.scriptLinks has unknown key "${key}". Expected one of: ` +
+            [...SCRIPT_LINK_KEYS].join(", "),
+        );
+      }
+    }
+    if (
+      !Array.isArray(scripted.keys) ||
+      scripted.keys.length === 0 ||
+      scripted.keys.some((k) => typeof k !== "string" || !k)
+    ) {
+      fail("links.scriptLinks.keys must be a non-empty list of property names");
+    }
+    if (scripted.textKey !== undefined && (typeof scripted.textKey !== "string" || !scripted.textKey)) {
+      fail("links.scriptLinks.textKey must be a property name");
     }
   }
 
@@ -331,6 +366,23 @@ export const anomalies = config.anomalies;
 
 /** Domains whose redirects are trusted enough to rewrite content against. */
 export const ownedDomains = Object.freeze([...config.links.ownedDomains]);
+
+/**
+ * Which properties of an inline script's object literals hold a URL the page
+ * renders as a link, or null when the content has no such widget.
+ *
+ * Off unless configured, because which property a theme turns into a link is
+ * a fact about one theme, and reading every string in every script as a URL
+ * would report data, not links.
+ *
+ * @type {{keys: readonly string[], textKey: string}|null}
+ */
+export const scriptLinks = config.links.scriptLinks
+  ? Object.freeze({
+      keys: Object.freeze([...config.links.scriptLinks.keys]),
+      textKey: config.links.scriptLinks.textKey ?? "title",
+    })
+  : null;
 
 /** Links that cannot be checked, each paired with the reason. */
 export const linkSkips = Object.freeze(

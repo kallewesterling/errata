@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { collectProblems } from "../../../src/problems.js";
-import { getInventory } from "../../../src/inventory.js";
+import { getInventory, getLinks } from "../../../src/inventory.js";
 
 /**
  * End-to-end coverage: a check reaches a report, not just a string.
@@ -131,6 +131,25 @@ describe("a finding carries enough to act on", () => {
         "courses.example.com/dirty-course",
       );
     }
+  });
+});
+
+describe("the resource card in lesson 10", () => {
+  // links.scriptLinks is set in this fixture. Link health needs the network,
+  // so what is asserted here is the inventory the network tier would check.
+  const cards = getLinks().filter((link) => link.kind === "script-link");
+
+  it("is in the link inventory, and the commented-out template is not", () => {
+    expect(cards.map((card) => card.url)).toEqual(["https://example.com/watch?v=abc&amp;t=2691s"]);
+  });
+
+  it("is named by its title and located in its lesson", () => {
+    const [card] = cards;
+    expect(card.text).toBe("A talk");
+    expect(card.attr).toBe("script");
+    expect(card.editorRef).toMatch(/content-dirtyitem10a\.html:\d+:\d+$/);
+    expect(card.lessonUrl).toContain("courses.example.com/dirty-course");
+    expect(card.script?.group).toBeTruthy();
   });
 });
 

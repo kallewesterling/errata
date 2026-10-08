@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { comparable, fragmentOf, hasAnchor } from "../../src/links.js";
-import { judge, rewriteTarget, safeRewrites } from "../../src/link-health.js";
+import {
+  applyLinkRewrites,
+  convergingScriptLinks,
+  judge,
+  rewriteTarget,
+  safeRewrites,
+} from "../../src/link-health.js";
+import { extractLinks } from "../../src/prose-links.js";
+import { extractScriptLinks } from "../../src/scripts.js";
 
 /**
  * A checked URL that came back clean.
@@ -275,5 +283,177 @@ describe("rewriteTarget", () => {
       "https://edu.chainguard.dev/b/page/",
     );
     expect(rewriteTarget(result)).toBe("https://edu.chainguard.dev/b/page/#a%20b");
+  });
+});
+
+/**
+ * Every link in one lesson, shaped the way the inventory shapes them, so the
+ * rewrite tests run on what the extractors really produce.
+ *
+ * @param {string} html
+ * @returns {import("../../src/inventory.js").ProseLink[]}
+ */
+function sitesIn(html) {
+  const raws = [
+    ...extractLinks(html, "lesson.html").map((raw) => ({ raw, kind: /** @type {const} */ ("link") })),
+    ...extractScriptLinks(html, "lesson.html", { keys: ["link"], textKey: "title" }).map((raw) => ({
+      raw,
+      kind: /** @type {const} */ ("script-link"),
+    })),
+  ];
+  return raws.map(({ raw, kind }) => ({
+    id: `Course/lesson/item#${kind}${raw.ordinal}`,
+    fingerprint: "",
+    url: raw.url,
+    rawHref: raw.rawHref,
+    attr: raw.attr,
+    kind,
+    text: raw.text,
+    scheme: raw.scheme,
+    source: raw.source,
+    ...(raw.script ? { script: raw.script } : {}),
+    editorRef: `lesson.html:${raw.source.line}:${raw.source.column}`,
+    lessonUrl: null,
+    course: { dir: "Course", id: null, title: "Course" },
+    lesson: { id: "lesson", slug: "lesson", title: "Lesson" },
+    contentItem: { id: "item", order: 1 },
+  }));
+}
+
+/**
+ * Verdicts as judge would give them for a domain we own, built directly so
+ * these tests hold whatever the run's ownedDomains setting says.
+ *
+ * @param {...import("../../src/links.js").LinkResult} results
+ * @returns {import("../../src/link-health.js").LinkVerdict[]}
+ */
+const verdictsFor = (...results) =>
+  results.map((result) => {
+    if (!result.redirect) return { result, verdict: "ok" };
+    return { result, verdict: result.redirect.permanent ? "moved" : "temporary" };
+  });
+
+describe("convergingScriptLinks", () => {
+  const cards = (...pairs) =>
+    `<script>const resources = { resources: [${pairs
+      .map(([title, link]) => `{ title: "${title}", link: "${link}" }`)
+      .join(", ")}] };</script>`;
+
+  it("holds back two cards in one array that would rewrite to the same page", () => {
+    const sites = sitesIn(
+      cards(["Old one", "https://example.com/docs/one"], ["Old two", "https://example.com/docs/two"]),
+    );
+    const verdicts = verdictsFor(
+      moved("https://example.com/docs/one", "https://example.com/guide/combined"),
+      moved("https://example.com/docs/two", "https://example.com/guide/combined"),
+    );
+    const held = convergingScriptLinks(verdicts, sites);
+    expect([...held.keys()].sort()).toEqual(sites.map((s) => s.id).sort());
+    expect(held.get(sites[0].id)?.target).toBe("https://example.com/guide/combined");
+  });
+
+  it("holds back a card that would rewrite onto another card already in the array", () => {
+    const sites = sitesIn(
+      cards(["Old", "https://example.com/docs/old"], ["Current", "https://example.com/guide/current/"]),
+    );
+    const verdicts = verdictsFor(
+      moved("https://example.com/docs/old", "https://example.com/guide/current"),
+      ok("https://example.com/guide/current/"),
+    );
+    expect([...convergingScriptLinks(verdicts, sites).keys()]).toEqual([sites[0].id]);
+  });
+
+  it("lets the same convergence through when the cards are in different arrays", () => {
+    const html =
+      `<script>const resources = { groups: { "a": [{ title: "One", link: "https://example.com/docs/one" }],` +
+      ` "b": [{ title: "Two", link: "https://example.com/docs/two" }] } };</script>`;
+    const verdicts = verdictsFor(
+      moved("https://example.com/docs/one", "https://example.com/guide/combined"),
+      moved("https://example.com/docs/two", "https://example.com/guide/combined"),
+    );
+    expect(convergingScriptLinks(verdicts, sitesIn(html)).size).toBe(0);
+  });
+
+  it("lets prose links converge, as it always has", () => {
+    const html =
+      '<p><a href="https://example.com/docs/one">one</a> and <a href="https://example.com/docs/two">two</a></p>';
+    const verdicts = verdictsFor(
+      moved("https://example.com/docs/one", "https://example.com/guide/combined"),
+      moved("https://example.com/docs/two", "https://example.com/guide/combined"),
+    );
+    expect(convergingScriptLinks(verdicts, sitesIn(html)).size).toBe(0);
+  });
+
+  it("ignores redirects that are not going to be applied anyway", () => {
+    const sites = sitesIn(
+      cards(["One", "https://example.com/docs/one"], ["Two", "https://example.com/docs/two"]),
+    );
+    const verdicts = verdictsFor(
+      moved("https://example.com/docs/one", "https://example.com/guide/combined", 302),
+      moved("https://example.com/docs/two", "https://example.com/guide/combined", 302),
+    );
+    expect(convergingScriptLinks(verdicts, sites).size).toBe(0);
+  });
+});
+
+describe("applyLinkRewrites", () => {
+  it("rewrites a card's link in place, keeping its quote and everything around it", () => {
+    const html =
+      "<script>\n  const resources = { resources: [\n    { title: 'Guide', link: 'https://example.com/docs/guide', addUTM: true }, // note\n  ] };\n</script>";
+    const moves = new Map([["https://example.com/docs/guide", "https://example.com/guide/start"]]);
+    const result = applyLinkRewrites(html, sitesIn(html), moves);
+    expect(result.edits).toBe(1);
+    expect(result.html).toBe(html.replace("https://example.com/docs/guide", "https://example.com/guide/start"));
+  });
+
+  it("does not touch the same URL in a commented-out template", () => {
+    const url = "https://example.com/docs/guide";
+    const html = `<script>const resources = {\n/* resources: [{ title: "t", link: "${url}" }] */\nresources: [{ title: "Guide", link: "${url}" }] };</script>`;
+    const result = applyLinkRewrites(html, sitesIn(html), new Map([[url, "https://example.com/guide/start"]]));
+    expect(result.edits).toBe(1);
+    expect(result.html).toContain(`/* resources: [{ title: "t", link: "${url}" }] */`);
+    expect(result.html).toContain('link: "https://example.com/guide/start" }] };');
+  });
+
+  it("rewrites an href and a card link in the same file", () => {
+    const html =
+      '<p><a href="https://example.com/a">a</a></p>\n<script>const r = [{ title: "B", link: "https://example.com/b" }];</script>';
+    const moves = new Map([
+      ["https://example.com/a", "https://example.com/new/a"],
+      ["https://example.com/b", "https://example.com/new/b"],
+    ]);
+    const result = applyLinkRewrites(html, sitesIn(html), moves);
+    expect(result.edits).toBe(2);
+    expect(result.html).toBe(
+      '<p><a href="https://example.com/new/a">a</a></p>\n<script>const r = [{ title: "B", link: "https://example.com/new/b" }];</script>',
+    );
+  });
+
+  it("escapes the new URL for the quote it is written in", () => {
+    const html = `<script>const r = [{ title: "T", link: 'https://example.com/a' }];</script>`;
+    const result = applyLinkRewrites(html, sitesIn(html), new Map([["https://example.com/a", "https://example.com/it's"]]));
+    expect(result.html).toContain("link: 'https://example.com/it\\'s'");
+  });
+
+  it("refuses an edit whose text has changed since it was read", () => {
+    const html = `<script>const r = [{ title: "T", link: "https://example.com/a" }];</script>`;
+    const sites = sitesIn(html);
+    const edited = html.replace("link:", "href:");
+    const result = applyLinkRewrites(edited, sites, new Map([["https://example.com/a", "https://example.com/b"]]));
+    expect(result.edits).toBe(0);
+    expect(result.html).toBe(edited);
+  });
+
+  it("leaves a held card alone, and rewrites the rest", () => {
+    const html =
+      '<script>const r = [{ title: "A", link: "https://example.com/a" }, { title: "B", link: "https://example.com/b" }];</script>';
+    const sites = sitesIn(html);
+    const moves = new Map([
+      ["https://example.com/a", "https://example.com/new/a"],
+      ["https://example.com/b", "https://example.com/new/b"],
+    ]);
+    const result = applyLinkRewrites(html, sites.filter((s) => s.url !== "https://example.com/a"), moves);
+    expect(result.html).toContain('link: "https://example.com/a"');
+    expect(result.html).toContain('link: "https://example.com/new/b"');
   });
 });

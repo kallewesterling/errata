@@ -13,6 +13,26 @@ the three-week gap that separates that work from 0.2.0.
 
 ## [Unreleased]
 
+### Added
+
+- `links.scriptLinks` checks the links on resource cards that a theme builds
+  from an object literal in an inline `<script>`. The reader sees these as
+  links, but the file has no `<a href>`, so `check:links` never saw them. The
+  setting names the properties that hold a URL, and is off when absent, which
+  leaves the link inventory exactly as it was. Scripts are read with a
+  JavaScript parser (acorn, a new dependency), because a regex cannot tell a
+  live card from one in a commented-out template, and a content repository
+  this was written against keeps such a template in 106 of its 583 widget
+  scripts. A card is reported under its title, by the same checks as a
+  prose link.
+- `fix:links` rewrites a card's link where it stands, after checking that the
+  text there is still `link: "old"`. It never writes the script again, and
+  never touches the same URL in a commented-out template.
+- `moved-link-converging` reports cards in one list that would point at the
+  same page after a rewrite, and `fix:links` leaves them alone. Two tiles for
+  one page, under titles written for two different pages, is worse than an
+  extra redirect hop.
+
 ## [0.4.0] — 2026-10-08
 
 ### Added

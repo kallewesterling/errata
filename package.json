@@ -27,6 +27,7 @@
     "vitest": "^3.0.5"
   },
   "dependencies": {
+    "acorn": "^8.19.0",
     "dockerfile-ast": "^0.7.0",
     "entities": "^6.0.0",
     "parse5": "^7.2.1",

@@ -48,8 +48,9 @@ npm run fix:links -- --dry-run     # Show the changes, but write nothing.
 - The check that has only now run confirmed that the page moved permanently.
 - The old URL maps to exactly one new URL.
 - The domain is in `links.ownedDomains`.
+- For a resource card, no other card in the same list would point at the same page afterwards.
 
-`fix:links` edits the `href` text where it stands. It does not write the HTML document again. These files go back to Skilljar, and a regenerated document gives you a diff that nobody can review.
+`fix:links` edits the `href` text, or the card's `link` value, where it stands. It does not write the HTML document again. These files go back to Skilljar, and a regenerated document gives you a diff that nobody can review.
 
 Both commands exit with a non-zero code only for a finding that needs a person.
 

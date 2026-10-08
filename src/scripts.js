@@ -16,8 +16,10 @@
  * the prose convention consistently is exactly how this gets written. That is
  * why it needs a tool rather than a careful reader.
  */
+import { parse as parseJs } from "acorn";
 import { parseFragment } from "parse5";
 import { fingerprint } from "./extract.js";
+import { classifyHref } from "./prose-links.js";
 
 /**
  * What counts as an entity here.
@@ -116,4 +118,165 @@ export function extractScriptEntities(html, relPath) {
   });
 
   return found;
+}
+
+/**
+ * `type` values a browser runs as JavaScript. Anything else — JSON-LD, a
+ * template, a data block — is inert text, and reading it as code would
+ * report URLs no reader is ever sent to.
+ */
+const JS_TYPES = new Set(["", "text/javascript", "application/javascript", "module"]);
+
+/**
+ * @typedef {object} ScriptSite
+ * @property {string} key        Which property held the URL.
+ * @property {string} quote      The quote the literal was written in.
+ * @property {string|null} group  The array the card sits in, or null when it
+ *   sits in none. Two cards with the same group are siblings on the page.
+ * @property {number} keyOffset  Where the property starts in the file, so a
+ *   rewrite can check it is editing `key: "value"` and nothing else.
+ */
+
+/**
+ * The value of a string literal, or null when it has no fixed value.
+ *
+ * A template literal counts only without expressions: `${base}/page` is built
+ * at run time, and nothing here can say what it becomes.
+ *
+ * @param {any} node
+ * @returns {{value: string, raw: string, quote: string}|null}
+ */
+function staticString(node) {
+  if (node?.type === "Literal" && typeof node.value === "string") {
+    return { value: node.value, raw: node.raw.slice(1, -1), quote: node.raw[0] };
+  }
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
+    const quasi = node.quasis[0].value;
+    return { value: quasi.cooked ?? quasi.raw, raw: quasi.raw, quote: "`" };
+  }
+  return null;
+}
+
+/** The name of a non-computed property key, written bare or quoted. */
+function keyName(property) {
+  if (property.computed) return null;
+  if (property.key.type === "Identifier") return property.key.name;
+  if (property.key.type === "Literal" && typeof property.key.value === "string") {
+    return property.key.value;
+  }
+  return null;
+}
+
+/**
+ * Every URL a resource widget renders as a link, from the inline scripts of
+ * one lesson file.
+ *
+ * Some themes build cards from an object literal in an inline script and turn
+ * each card's `link` into an `<a>`. The reader sees a link like any other,
+ * but no `<a href>` exists in the file for a link check to find.
+ *
+ * Read with a JavaScript parser, because the comments are the hard part. A
+ * content repository this was written against keeps a template object
+ * commented out in 106 of its 583 widget scripts, with line comments inside
+ * the block comment and beside the live cards. A regex would read the
+ * template's placeholder as a link in every one of those files.
+ *
+ * The value is the string the script holds: JavaScript escapes are resolved,
+ * HTML entities are not, because a script is raw text and nothing decodes
+ * them on the way to the page (see the note at the top of this file).
+ * A script that does not parse is skipped. It is broken in a way this cannot
+ * describe, and a guess at its contents would be worse than nothing.
+ *
+ * @param {string} html
+ * @param {string} relPath
+ * @param {{keys: readonly string[], textKey: string}} options
+ * @returns {(import("./prose-links.js").RawLink & {script: ScriptSite})[]}
+ */
+export function extractScriptLinks(html, relPath, { keys, textKey }) {
+  const wanted = new Set(keys);
+  const fragment = parseFragment(html, { sourceCodeLocationInfo: true });
+  const found = [];
+
+  collectScripts(fragment).forEach((node, scriptOrdinal) => {
+    const attrs = new Map((node.attrs ?? []).map((a) => [a.name, a.value]));
+    const type = (attrs.get("type") ?? "").trim().toLowerCase();
+    if (attrs.has("src") || !JS_TYPES.has(type)) return;
+
+    const loc = node.sourceCodeLocation;
+    const start = loc?.startTag?.endOffset;
+    const end = loc?.endTag?.startOffset;
+    if (start === undefined || end === undefined || end <= start) return;
+
+    let program;
+    try {
+      program = parseJs(html.slice(start, end), {
+        ecmaVersion: "latest",
+        sourceType: type === "module" ? "module" : "script",
+      });
+    } catch {
+      return;
+    }
+
+    let arrays = 0;
+    const visit = (value, group) => {
+      if (Array.isArray(value)) {
+        for (const item of value) visit(item, group);
+        return;
+      }
+      if (!value || typeof value !== "object" || typeof value.type !== "string") return;
+
+      if (value.type === "ArrayExpression") {
+        const own = `script${scriptOrdinal}:array${arrays++}`;
+        for (const element of value.elements) visit(element, own);
+        return;
+      }
+
+      if (value.type === "ObjectExpression") {
+        const text = value.properties.find(
+          (p) => p.type === "Property" && keyName(p) === textKey,
+        );
+        const label = text ? staticString(text.value)?.value ?? "" : "";
+
+        for (const property of value.properties) {
+          const key = property.type === "Property" ? keyName(property) : null;
+          const literal = key !== null && wanted.has(key) ? staticString(property.value) : null;
+          if (!literal) {
+            visit(property, group);
+            continue;
+          }
+
+          const offset = start + property.value.start;
+          const before = html.slice(0, offset);
+          const line = before.split("\n").length;
+          found.push({
+            url: literal.value,
+            rawHref: literal.raw,
+            attr: /** @type {const} */ ("script"),
+            text: label.replace(/\s+/g, " ").trim(),
+            scheme: classifyHref(literal.value),
+            ordinal: 0,
+            source: {
+              file: relPath,
+              line,
+              column: offset - (before.lastIndexOf("\n") + 1) + 1,
+              endLine: line,
+              startOffset: offset,
+              endOffset: start + property.value.end,
+            },
+            script: { key, quote: literal.quote, group, keyOffset: start + property.start },
+          });
+        }
+        return;
+      }
+
+      for (const [field, child] of Object.entries(value)) {
+        if (field !== "loc" && field !== "range") visit(child, group);
+      }
+    };
+    visit(program, null);
+  });
+
+  return found
+    .sort((a, b) => a.source.startOffset - b.source.startOffset)
+    .map((link, ordinal) => ({ ...link, ordinal }));
 }

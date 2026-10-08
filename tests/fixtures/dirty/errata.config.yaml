@@ -39,6 +39,10 @@ links:
   ownedDomains:
     - example.com
   skip: []
+  # Lesson 10 builds a card from an inline script. The clean fixture has one
+  # too and leaves this unset, which is what proves the option is opt-in.
+  scriptLinks:
+    keys: [link]
 
 driftBudget:
   staleImageRefs: 0
