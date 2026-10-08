@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { duplication, primaryDomain, repoRoot, terminology } from "./config.js";
+import { duplication, primaryDomain, repoRoot, scriptLinks, terminology } from "./config.js";
 import { classify } from "./classify.js";
 import { sentences, shingles, visibleText, words } from "./duplication.js";
 import { extractBlocks, fingerprint } from "./extract.js";
@@ -10,7 +10,7 @@ import { READER_FIELDS, lessonUrl, loadCourses } from "./mirror.js";
 import { linkBlocks } from "./pairing.js";
 import { findProseDefects } from "./prose-defects.js";
 import { extractImages, extractLinks } from "./prose-links.js";
-import { extractScriptEntities } from "./scripts.js";
+import { extractScriptEntities, extractScriptLinks } from "./scripts.js";
 import { compileTerms, findRetiredInSlug, findRetiredTerms } from "./terminology.js";
 import { findTemplateValues, findUnwritten } from "./unwritten.js";
 import { collectWarnings } from "./warnings.js";
@@ -126,8 +126,9 @@ export function getInventory() {
  *   any known-issues entry that accepted the old one.
  * @property {string} url
  * @property {string} rawHref
- * @property {"href"|"src"} attr
- * @property {"link"|"image"} kind  What the page does with it.
+ * @property {"href"|"src"|"script"} attr
+ * @property {"link"|"image"|"script-link"} kind  What the page does with it.
+ *   A `script-link` is a card a widget builds from an inline script.
  * @property {string} text         Link or alt text, for recognizing it.
  * @property {import("./prose-links.js").RawLink["scheme"]} scheme
  * @property {import("./extract.js").SourceLocation} source
@@ -136,11 +137,14 @@ export function getInventory() {
  * @property {{dir: string, id: string|null, title: string}} course
  * @property {{id: string, slug: string, title: string}} lesson
  * @property {{id: string, order: number}} contentItem
+ * @property {import("./scripts.js").ScriptSite} [script]  For a script-link,
+ *   where in the script it sits.
  */
 
 /**
  * Build the inventory of everything lesson prose points at: `<a href>` and
- * `<img src>`.
+ * `<img src>`, and, when `links.scriptLinks` is set, the cards a widget
+ * builds from an inline script.
  *
  * Kept separate from the block inventory rather than folded into it because
  * the two answer different questions and are checked by different tiers. An
@@ -165,6 +169,10 @@ export function buildLinkInventory() {
         const kinds = /** @type {const} */ ([
           { kind: "link", raws: extractLinks(html, relPath) },
           { kind: "image", raws: extractImages(html, relPath) },
+          {
+            kind: "script-link",
+            raws: scriptLinks ? extractScriptLinks(html, relPath, scriptLinks) : [],
+          },
         ]);
 
         for (const { kind, raws } of kinds) {
@@ -184,6 +192,7 @@ export function buildLinkInventory() {
               course: { dir: course.dir, id: course.id, title: course.title },
               lesson: { id: lesson.id, slug: lesson.slug, title: lesson.title },
               contentItem: { id: item.id, order: item.order },
+              ...(raw.script ? { script: raw.script } : {}),
             });
           }
         }

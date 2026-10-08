@@ -147,6 +147,122 @@ export function judge(results) {
 export const safeRewrites = (verdicts) => verdicts.filter((v) => v.verdict === "moved");
 
 /**
+ * Script cards that would end up pointing where a sibling card points.
+ *
+ * `judge` deliberately does not count how many links share a destination,
+ * because after a site reorganizes several old addresses legitimately resolve
+ * to one new page, and a prose link to it is still one sentence pointing at
+ * one page. A resource card is different. Each card in a widget's array is a
+ * tile on the page, so two cards rewritten onto one URL are two tiles for one
+ * page, with titles that no longer describe what they link to. The same holds
+ * for a card rewritten onto the page a sibling card already links to.
+ *
+ * This is a question about sites rather than URLs, which is why it is not a
+ * verdict: one URL can collide in one lesson's widget and be fine everywhere
+ * else. It narrows `safeRewrites` and never widens it, and the report and the
+ * rewriter both ask it, so neither has its own idea of what is safe.
+ *
+ * @param {LinkVerdict[]} verdicts
+ * @param {import("./inventory.js").ProseLink[]} links
+ * @returns {Map<string, {target: string, with: string[]}>}  Held sites by id,
+ *   with where each would land and the sibling cards it collides with.
+ */
+export function convergingScriptLinks(verdicts, links) {
+  const targets = new Map(
+    safeRewrites(verdicts).map((v) => [v.result.url, rewriteTarget(v.result)]),
+  );
+
+  /** Each array's cards, per file, since a group is only unique in its file. */
+  const arrays = new Map();
+  for (const link of links) {
+    if (link.kind !== "script-link" || !link.script?.group) continue;
+    const at = `${link.source.file}\u0000${link.script.group}`;
+    if (!arrays.has(at)) arrays.set(at, []);
+    arrays.get(at).push(link);
+  }
+
+  const held = new Map();
+  for (const cards of arrays.values()) {
+    const landing = cards.map((card) => {
+      const target = targets.get(card.url);
+      return { card, target, lands: comparable(target ?? card.url) };
+    });
+    for (const mine of landing) {
+      if (mine.target === undefined) continue;
+      const others = landing.filter((other) => other !== mine && other.lands === mine.lands);
+      if (others.length === 0) continue;
+      held.set(mine.card.id, { target: mine.target, with: others.map((o) => o.card.id) });
+    }
+  }
+  return held;
+}
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Apply moved-link rewrites to one file's text.
+ *
+ * An attribute is rewritten by matching the attribute rather than the bare
+ * URL, so the same URL in prose text or a code block is left alone, and the
+ * attribute name comes from the occurrence, so an image is never edited as if
+ * it were a link.
+ *
+ * A script card is rewritten at the offset the parser found it, and only
+ * after checking that the text there is still `key: "old"`. A text search
+ * would also rewrite the same URL wherever else it appears in the script,
+ * which in a widget is typically a commented-out template that holds it.
+ * Script edits go first, from the end of the file backwards, so none of them
+ * moves another, and the attribute edits after them do not depend on offsets.
+ *
+ * Neither ever reserializes the document. These files round-trip to a
+ * publishing system, and a regenerated file is a diff nobody can review.
+ *
+ * @param {string} html
+ * @param {import("./inventory.js").ProseLink[]} sites  Sites in this file to
+ *   rewrite. Held sites must already be left out.
+ * @param {Map<string, string>} moves  Old URL to new URL.
+ * @returns {{html: string, edits: number}}
+ */
+export function applyLinkRewrites(html, sites, moves) {
+  let out = html;
+  let edits = 0;
+
+  const cards = sites
+    .filter((site) => site.kind === "script-link" && site.script && moves.has(site.url))
+    .sort((a, b) => b.source.startOffset - a.source.startOffset);
+  for (const card of cards) {
+    const { key, quote, keyOffset } = /** @type {import("./scripts.js").ScriptSite} */ (card.script);
+    const { startOffset, endOffset } = card.source;
+    const shape = new RegExp(
+      `^(["']?)${escapeRegExp(key)}\\1\\s*:\\s*${escapeRegExp(quote)}${escapeRegExp(card.rawHref)}${escapeRegExp(quote)}$`,
+    );
+    if (!shape.test(out.slice(keyOffset, endOffset))) continue;
+
+    let to = /** @type {string} */ (moves.get(card.url))
+      .replace(/\\/g, "\\\\")
+      .replaceAll(quote, `\\${quote}`);
+    if (quote === "`") to = to.replaceAll("${", "\\${");
+    out = `${out.slice(0, startOffset)}${quote}${to}${quote}${out.slice(endOffset)}`;
+    edits += 1;
+  }
+
+  for (const site of sites) {
+    if (site.kind === "script-link" || !moves.has(site.url)) continue;
+    const pattern = new RegExp(
+      `(${site.attr}\\s*=\\s*["'])${escapeRegExp(site.rawHref)}(["'])`,
+      "g",
+    );
+    const updated = out.replace(pattern, `$1${moves.get(site.url)}$2`);
+    if (updated !== out) {
+      out = updated;
+      edits += 1;
+    }
+  }
+
+  return { html: out, edits };
+}
+
+/**
  * The URL a moved link should be rewritten to.
  *
  * A redirect response can never report a fragment, because fragments are not
@@ -177,6 +293,7 @@ export const LINK_PROBLEM_IDS = Object.freeze([
   "missing-fragment",
   "temporary-redirect",
   "unreachable-link",
+  "moved-link-converging",
 ]);
 
 /**
@@ -206,20 +323,39 @@ export function collectLinkProblems(verdicts, links) {
     sites.get(link.url).push(link);
   }
 
+  const held = convergingScriptLinks(verdicts, links);
+
   /** Where a URL appears, so a finding can be acted on. */
-  const locationsFor = (url) =>
-    (sites.get(url) ?? []).map((link) => ({
-      editorRef: link.editorRef,
-      url: link.lessonUrl,
-    }));
+  const locationsFor = (url, except = new Set()) =>
+    (sites.get(url) ?? [])
+      .filter((link) => !except.has(link.id))
+      .map((link) => ({ editorRef: link.editorRef, url: link.lessonUrl }));
+
+  /**
+   * The titles of the cards a URL appears on. A card has no visible link text
+   * of its own in the file, so its title is what names it to a reader.
+   */
+  const cardsFor = (url) => {
+    const titles = [
+      ...new Set(
+        (sites.get(url) ?? [])
+          .filter((link) => link.kind === "script-link" && link.text)
+          .map((link) => link.text),
+      ),
+    ];
+    return titles.length ? [["card", titles.join("; ")]] : [];
+  };
 
   /** One finding per URL, keyed by the URL so an edit expires any acceptance. */
-  const item = (verdict, summary, details) => ({
+  const item = (verdict, summary, details = [], except = undefined) => ({
     summary,
     key: verdict.result.url,
-    details,
-    locations: locationsFor(verdict.result.url),
+    details: [...cardsFor(verdict.result.url), ...details],
+    locations: locationsFor(verdict.result.url, except),
   });
+
+  const heldIds = new Set(held.keys());
+  const byId = new Map(links.map((link) => [link.id, link]));
 
   /** What the page does with a URL. The same URL can be both. */
   const usedAs = (url, kind) =>
@@ -239,7 +375,7 @@ export function collectLinkProblems(verdicts, links) {
         "Find where the page moved to and update the href, or remove the " +
         "sentence if the material no longer exists.",
       items: of("dead")
-        .filter((v) => usedAs(v.result.url, "link"))
+        .filter((v) => usedAs(v.result.url, "link") || usedAs(v.result.url, "script-link"))
         .map((v) => item(v, `${style.link(v.result.url)}  ${style.bad(v.result.detail)}`)),
       accepted: [],
     },
@@ -277,9 +413,48 @@ export function collectLinkProblems(verdicts, links) {
         "Run `npm run fix:links` to rewrite these to their current addresses, " +
         "then read the diff: the destination is correct by construction, but " +
         "the sentence around the link may need rewording.",
-      items: of("moved").map((v) =>
-        item(v, style.link(v.result.url), [["now at", rewriteTarget(v.result)]]),
-      ),
+      // A card held back below is reported there, not here: fix:links will
+      // not rewrite it, and listing it here would promise that it does.
+      items: of("moved")
+        .map((v) =>
+          item(v, style.link(v.result.url), [["now at", rewriteTarget(v.result)]], heldIds),
+        )
+        .filter((found) => found.locations.length > 0),
+      accepted: [],
+    },
+    {
+      id: "moved-link-converging",
+      category: /** @type {const} */ ("stale"),
+      severity: "warning",
+      title: "resource cards that would end up pointing at the same page",
+      why:
+        "Each of these has permanently moved, and following the redirect is " +
+        "safe for a sentence. These are cards in one widget, though, and the " +
+        "move lands each on the page a sibling card in the same list points " +
+        "at, so applying it would put two cards on the page for one page, " +
+        "under titles that no longer describe it.",
+      fix:
+        "Decide what the widget should list now. Usually that is one card for " +
+        "the new page, with a title that describes it, and the others removed. " +
+        "fix:links leaves these alone.",
+      items: [...held].map(([id, { target, with: others }]) => {
+        const card = /** @type {import("./inventory.js").ProseLink} */ (byId.get(id));
+        return {
+          summary: `${style.link(card.url)}  ${style.muted(card.text || "(no title)")}`,
+          key: `${id.split("#")[0]} ${card.url}`,
+          details: [
+            ["lands on", target],
+            [
+              "same as",
+              others
+                .map((other) => byId.get(other))
+                .map((other) => `${other?.text || "(no title)"} (${other?.url})`)
+                .join("; "),
+            ],
+          ],
+          locations: [{ editorRef: card.editorRef, url: card.lessonUrl }],
+        };
+      }),
       accepted: [],
     },
     {

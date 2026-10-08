@@ -16,12 +16,14 @@ import { parseFragment } from "parse5";
  * @property {string} url      The attribute value, entity-decoded.
  * @property {string} rawHref  The value exactly as it appears in the file,
  *   which is what a rewriter has to match against the source.
- * @property {"href"|"src"} attr  Which attribute carried it, so a rewriter
- *   edits the right one.
+ * @property {"href"|"src"|"script"} attr  Which attribute carried it, so a
+ *   rewriter edits the right one. `script` is a property in an inline
+ *   script's object literal, described by `script`.
  * @property {string} text     Link text or alt text, on a single line.
  * @property {"http"|"mailto"|"anchor"|"relative"|"other"} scheme
  * @property {number} ordinal  0-based index within its file, per kind.
  * @property {import("./extract.js").SourceLocation} source
+ * @property {import("./scripts.js").ScriptSite} [script]
  */
 
 /** Collect every element with the given tag name, in document order. */

@@ -267,6 +267,38 @@ describe("configuration validation", () => {
     expect(result.stderr).toContain("nonImageNamespaces must be a list");
   });
 
+  describe("links.scriptLinks", () => {
+    const withLinks = (yaml) => loadConfig(VALID.replace(/^links:\n/m, `links:\n${yaml}`));
+
+    it("is optional", () => {
+      expect(VALID).not.toContain("scriptLinks");
+      expect(loadConfig(VALID).ok).toBe(true);
+    });
+
+    it("accepts the keys alone, and with a text key", () => {
+      expect(withLinks("  scriptLinks: { keys: [link] }\n").ok).toBe(true);
+      expect(withLinks("  scriptLinks: { keys: [link, url], textKey: name }\n").ok).toBe(true);
+    });
+
+    it("rejects an empty list of keys, which would check nothing", () => {
+      const result = withLinks("  scriptLinks: { keys: [] }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain("links.scriptLinks.keys");
+    });
+
+    it("rejects an unknown key in it", () => {
+      const result = withLinks("  scriptLinks: { keys: [link], titleKey: title }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain('links.scriptLinks has unknown key "titleKey"');
+    });
+
+    it("rejects a misspelt setting under links, rather than ignoring it", () => {
+      const result = withLinks("  scriptLink: { keys: [link] }\n");
+      expect(result.ok).toBe(false);
+      expect(result.stderr).toContain('unknown setting "links.scriptLink"');
+    });
+  });
+
   describe("terminology", () => {
     const withTerms = (yaml) => loadConfig(`${VALID}\nterminology:\n${yaml}`);
 

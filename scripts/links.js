@@ -19,8 +19,10 @@ import { isOwnedDomain, repoRoot } from "../src/config.js";
 import { getLinks } from "../src/inventory.js";
 import { checkUrls } from "../src/links.js";
 import {
+  applyLinkRewrites,
   checkableLinks,
   collectLinkProblems,
+  convergingScriptLinks,
   judge,
   rewriteTarget,
   safeRewrites,
@@ -56,20 +58,20 @@ const problems = collectLinkProblems(verdicts, links).filter((p) => p.items.leng
 /**
  * Rewrite the confirmed-safe redirects in place.
  *
- * Replacement is done on the exact href text rather than by regenerating the
- * HTML, because these files round-trip to a publishing system and reserializing
- * them would produce a diff full of incidental markup changes that reviewers
- * cannot read past.
+ * The edit itself is `applyLinkRewrites`, which replaces exact text rather
+ * than regenerating the HTML. Cards that would converge on one page are left
+ * out first, by the same rule the report uses to list them.
  */
 function applyFixes({ dryRun }) {
   const moves = new Map(
     safeRewrites(verdicts).map((v) => [v.result.url, rewriteTarget(v.result)]),
   );
   if (moves.size === 0) return { files: 0, edits: 0 };
+  const held = convergingScriptLinks(verdicts, links);
 
   const byFile = new Map();
   for (const link of checkableLinks(links)) {
-    if (!moves.has(link.url)) continue;
+    if (!moves.has(link.url) || held.has(link.id)) continue;
     if (!byFile.has(link.source.file)) byFile.set(link.source.file, []);
     byFile.get(link.source.file).push(link);
   }
@@ -77,26 +79,9 @@ function applyFixes({ dryRun }) {
   let edits = 0;
   for (const [relFile, inFile] of byFile) {
     const absFile = path.resolve(repoRoot, relFile);
-    let html = fs.readFileSync(absFile, "utf8");
-
-    for (const link of inFile) {
-      const to = moves.get(link.url);
-      // Match the attribute rather than the bare URL so a URL that also appears
-      // in prose text or inside a code block is left alone. The attribute name
-      // comes from the occurrence, so an image is never edited as if it were a
-      // link, and vice versa.
-      const pattern = new RegExp(
-        `(${link.attr}\\s*=\\s*["'])${link.rawHref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(["'])`,
-        "g",
-      );
-      const updated = html.replace(pattern, `$1${to}$2`);
-      if (updated !== html) {
-        html = updated;
-        edits += 1;
-      }
-    }
-
-    if (!dryRun) fs.writeFileSync(absFile, html);
+    const result = applyLinkRewrites(fs.readFileSync(absFile, "utf8"), inFile, moves);
+    edits += result.edits;
+    if (!dryRun && result.edits > 0) fs.writeFileSync(absFile, result.html);
   }
 
   return { files: byFile.size, edits };
@@ -119,7 +104,12 @@ function markdown() {
     )];
 
   const out = [];
-  const fixed = safeRewrites(verdicts);
+  // A URL counts as rewritten only if at least one of its sites was: a card
+  // held back at every site where it appears was left as it was.
+  const held = convergingScriptLinks(verdicts, links);
+  const fixed = safeRewrites(verdicts).filter((v) =>
+    checkableLinks(links).some((l) => l.url === v.result.url && !held.has(l.id)),
+  );
 
   if (fixed.length > 0) {
     out.push(
@@ -173,6 +163,18 @@ function markdown() {
         "A reader lands at the top of the page instead of the section they were promised.",
       row: (v) => `| ${v.result.url} | ${where(v.result.url).join("<br>")} |`,
       head: "| Link | Appears in |",
+    },
+    {
+      list: [...convergingScriptLinks(verdicts, links)].map(([id, held]) => ({
+        card: links.find((l) => l.id === id),
+        ...held,
+      })),
+      title: "Resource cards that would converge on one page",
+      blurb:
+        "These moved, but each would land on the page a sibling card in the same widget " +
+        "already points at, giving two cards for one page. They were left for a person.",
+      row: (h) => `| ${h.card?.text || "(no title)"} | ${h.card?.url} | ${h.target} |`,
+      head: "| Card | Link | Would land on |",
     },
     {
       list: of("review"),
